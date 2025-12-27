@@ -31,6 +31,10 @@
                 <a class="nav-link-custom" href="#" id="nav-alerts"><i class="bi bi-exclamation-triangle ms-2"></i>
                     النواقص</a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="branches.html" id="nav-branches"><i class="bi bi-geo-alt ms-2"></i>
+                    إدارة الفروع</a>
+            </li>
             <li class="nav-item mt-5">
                 <a class="nav-link-custom text-danger" href="login.html" onclick="localStorage.clear()"><i
                         class="bi bi-box-arrow-right ms-2"></i> تسجيل خروج</a>
@@ -102,6 +106,7 @@
                         <th>اسم الصنف</th>
                         <th>النوع</th>
                         <th>اللون</th>
+                        <th>الفرع</th>
                         <th>الكمية الحالية</th>
                         <th>حد الطلب</th>
                         <th>السعر (Cost)</th>
@@ -131,6 +136,12 @@
                         <div class="mb-3">
                             <label class="form-label">اسم الصنف</label>
                             <input type="text" class="form-control" id="itemName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">الفرع / المخزن</label>
+                            <select class="form-select" id="itemBranch" required>
+                                <option value="" disabled selected>اختر الفرع...</option>
+                            </select>
                         </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -192,6 +203,12 @@
                             <label class="form-label">اسم الصنف</label>
                             <input type="text" class="form-control" id="editItemName" required>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">الفرع / المخزن</label>
+                            <select class="form-select" id="editItemBranch" required>
+                                <option value="" disabled selected>اختر الفرع...</option>
+                            </select>
+                        </div>
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">النوع</label>
@@ -250,11 +267,15 @@
                     <p class="text-muted" id="scanBarcode">...</p>
 
                     <div class="row mt-4">
-                        <div class="col-6 text-end border-start">
+                        <div class="col-6 mb-3 border-start">
                             <small class="text-muted">السعر (Cost)</small>
                             <h4 class="fw-bold text-success" id="scanCost">0 ج.م</h4>
                         </div>
-                        <div class="col-6 mb-3">
+                        <div class="col-6 mb-3 text-start">
+                            <small class="text-muted">الفرع</small>
+                            <h5 id="scanBranch" class="fw-bold text-primary">-</h5>
+                        </div>
+                        <div class="col-6 mb-3 text-end">
                             <label class="text-muted d-block small">اللون</label>
                             <span id="scanColor" class="fw-bold">-</span>
                         </div>
@@ -279,6 +300,49 @@
                     <button type="button" class="btn btn-secondary w-50" data-bs-dismiss="modal">إغلاق</button>
                     <!-- Beep Sound for success -->
                     <audio id="beepSound" src="assets/beep.mp3"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Item Modal -->
+    <div class="modal fade" id="transferModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">تحويل كمية بين الفروع</h5>
+                    <button type="button" class="btn-close ms-auto me-0" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="transferForm">
+                        <input type="hidden" id="transferItemId">
+                        <div class="mb-3 p-3 bg-light rounded-3 text-start">
+                            <label class="d-block small text-muted">الصنف المراد تحويله</label>
+                            <span id="transferItemName" class="fw-bold"></span>
+                            <div class="small mt-1">
+                                <span class="text-muted">الفرع الحالي: </span>
+                                <span id="transferFromBranchName" class="fw-bold text-primary"></span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">الفرع المستهدف</label>
+                            <select class="form-select" id="transferToBranch" required>
+                                <option value="" disabled selected>اختر الفرع المستهدف...</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">الكمية المحولة</label>
+                            <div class="input-group" dir="ltr">
+                                <span class="input-group-text small" id="transferMaxQtyText">من أصل 0</span>
+                                <input type="number" class="form-control text-end" id="transferQty" required min="1">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-warning w-100 py-2 fw-bold mt-3"
+                            id="transferSubmitBtn">إتمام التحويل</button>
+                    </form>
                 </div>
             </div>
         </div>

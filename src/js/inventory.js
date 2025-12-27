@@ -1,4 +1,5 @@
 import { db } from "./firebase-config.js";
+window.inventoryStore = {};
 import { collection, addDoc, getDocs, query, where, Timestamp, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // === DOM Elements ===
@@ -8,6 +9,12 @@ const editItemForm = document.getElementById('editItemForm');
 const totalItemsEl = document.getElementById('total-items');
 const totalValueEl = document.getElementById('total-value');
 const lowStockEl = document.getElementById('low-stock-count');
+
+// --- Branch Selectors ---
+const itemBranchSelect = document.getElementById('itemBranch');
+const editItemBranchSelect = document.getElementById('editItemBranch');
+const transferToBranchSelect = document.getElementById('transferToBranch');
+const transferForm = document.getElementById('transferForm');
 
 // === Load Inventory ===
 async function loadInventory() {
@@ -22,10 +29,21 @@ async function loadInventory() {
         let totalVal = 0;
         let lowStock = 0;
 
+        // Fetch all branches first for lookup (or cache them)
+        const branchesSnap = await getDocs(collection(db, "branches"));
+        const branchMap = {};
+        branchesSnap.forEach(b => branchMap[b.id] = b.data().name);
+
+        // Populate branch dropdowns
+        populateBranchDropdowns(branchesSnap);
+
         querySnapshot.forEach((docSnapshot) => {
             const data = docSnapshot.data();
             const id = docSnapshot.id;
             const isLow = data.quantity <= (data.minQuantity || 0);
+
+            // Store for reuse
+            window.inventoryStore[id] = { id, ...data };
 
             if (isLow) lowStock++;
             totalCount += parseInt(data.quantity || 0);
@@ -40,14 +58,16 @@ async function loadInventory() {
                         <small class="d-block text-muted">${data.unit || ''}</small>
                     </td>
                     <td><small class="text-muted">${data.color || '-'}</small></td>
+                    <td><span class="badge bg-light text-dark border">${data.branchName || '-'}</span></td>
                     <td class="fw-bold">${data.quantity}</td>
                     <td>${data.minQuantity || 0}</td>
                     <td>${data.cost} ج.م</td>
                     <td>
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-outline-primary" onclick="printBarcode('${data.barcode}')" title="طباعة"><i class="bi bi-printer"></i></button>
-                            <button class="btn btn-sm btn-outline-info" onclick='editItem(${JSON.stringify({ id, ...data })})' title="تعديل"><i class="bi bi-pencil"></i></button>
+                        <div class="btn-group" dir="ltr">
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('${id}')" title="حذف"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-info" onclick="openEditModal('${id}')" title="تعديل"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="printBarcode('${data.barcode}')" title="طباعة"><i class="bi bi-printer"></i></button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="openTransferModal('${id}')" title="تحويل"><i class="bi bi-arrow-left-right"></i></button>
                         </div>
                     </td>
                 </tr>
@@ -65,6 +85,18 @@ async function loadInventory() {
         console.error("Error loading inventory:", error);
         if (tableBody) tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">خطأ في تحميل البيانات</td></tr>';
     }
+}
+
+function populateBranchDropdowns(branchesSnap) {
+    let options = '<option value="" disabled selected>اختر الفرع...</option>';
+    branchesSnap.forEach(doc => {
+        options += `<option value="${doc.id}">${doc.data().name}</option>`;
+    });
+    if (itemBranchSelect) itemBranchSelect.innerHTML = options;
+    if (editItemBranchSelect) editItemBranchSelect.innerHTML = options;
+
+    // For transfer, usually we exclude the current branch but simpler to just show all for now or filter in JS
+    if (transferToBranchSelect) transferToBranchSelect.innerHTML = options;
 }
 
 // === Helper: Generate Barcode ===
@@ -98,6 +130,8 @@ if (addItemForm) {
         submitBtn.disabled = true;
 
         const name = document.getElementById('itemName').value;
+        const branchId = document.getElementById('itemBranch').value;
+        const branchName = document.getElementById('itemBranch').options[document.getElementById('itemBranch').selectedIndex].text;
         const type = document.getElementById('itemType').value;
         const unit = document.getElementById('itemUnit').value;
         const color = document.getElementById('itemColor').value;
@@ -106,9 +140,10 @@ if (addItemForm) {
         const cost = parseFloat(document.getElementById('itemCost').value);
 
         try {
-            // Check for duplication/merge
+            // Check for duplication/merge (within same branch)
             const q = query(collection(db, "inventory"),
                 where("name", "==", name),
+                where("branchId", "==", branchId),
                 where("type", "==", type),
                 where("unit", "==", unit),
                 where("color", "==", color)
@@ -119,18 +154,17 @@ if (addItemForm) {
                 const existingDoc = existingSnapshot.docs[0];
                 const existingData = existingDoc.data();
 
-                if (confirm(`هذا الصنف موجود بالفعل بباركود (${existingData.barcode}). \nهل تريد إضافة الكمية (${qty}) للرصيد الحالي (${existingData.quantity})؟`)) {
+                if (confirm(`هذا الصنف موجود بالفعل في هذا الفرع بباركود (${existingData.barcode}). \nهل تريد إضافة الكمية (${qty}) للرصيد الحالي (${existingData.quantity})؟`)) {
                     await updateDoc(doc(db, "inventory", existingDoc.id), {
                         quantity: existingData.quantity + qty,
                         updatedAt: Timestamp.now()
                     });
                     alert('تم تحديث الكمية بنجاح!');
                 } else {
-                    // Create new batch/barcode
-                    await createNewBatch(name, type, unit, qty, minQty, cost, color);
+                    await createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName);
                 }
             } else {
-                await createNewBatch(name, type, unit, qty, minQty, cost, color);
+                await createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName);
             }
 
             bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
@@ -146,10 +180,11 @@ if (addItemForm) {
     });
 }
 
-async function createNewBatch(name, type, unit, qty, minQty, cost, color) {
+async function createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName) {
     const barcode = await generateDailyBarcode();
     await addDoc(collection(db, "inventory"), {
         name, type, unit, color: color || '', quantity: qty, minQuantity: minQty, cost, barcode,
+        branchId, branchName,
         createdAt: Timestamp.now(), updatedAt: Timestamp.now()
     });
     alert(`تمت الإضافة بنجاح! الباركود: ${barcode}`);
@@ -172,8 +207,12 @@ window.deleteItem = async function (id) {
 }
 
 // === Edit Item ===
-window.editItem = function (data) {
-    document.getElementById('editItemId').value = data.id;
+window.openEditModal = function (id) {
+    const data = window.inventoryStore[id];
+    if (!data) return;
+
+    document.getElementById('editItemId').value = id;
+    document.getElementById('editItemBranch').value = data.branchId || '';
     document.getElementById('editItemName').value = data.name;
     document.getElementById('editItemType').value = data.type;
     document.getElementById('editItemUnit').value = data.unit;
@@ -194,6 +233,8 @@ if (editItemForm) {
         submitBtn.disabled = true;
 
         const updatedData = {
+            branchId: document.getElementById('editItemBranch').value,
+            branchName: document.getElementById('editItemBranch').options[document.getElementById('editItemBranch').selectedIndex].text,
             name: document.getElementById('editItemName').value,
             type: document.getElementById('editItemType').value,
             unit: document.getElementById('editItemUnit').value,
@@ -276,10 +317,105 @@ function showScanModal(product) {
     document.getElementById('scanBarcode').innerText = product.barcode;
     document.getElementById('scanCost').innerText = (product.cost || 0) + ' ج.م';
     document.getElementById('scanColor').innerText = product.color || '-';
+    document.getElementById('scanBranch').innerText = product.branchName || '-';
     document.getElementById('scanQty').innerText = product.quantity;
     document.getElementById('scanType').innerText = product.type === 'raw' ? 'خام' : 'منتج تام';
     document.getElementById('scanUnit').innerText = product.unit || '-';
     new bootstrap.Modal(document.getElementById('scanModal')).show();
+}
+
+// === Transfer Item Logic ===
+let currentItemForTransfer = null;
+
+window.openTransferModal = function (id) {
+    const item = window.inventoryStore[id];
+    if (!item) return;
+
+    currentItemForTransfer = item;
+    document.getElementById('transferItemId').value = id;
+    document.getElementById('transferItemName').innerText = item.name;
+    document.getElementById('transferFromBranchName').innerText = item.branchName || 'غير محدد';
+    document.getElementById('transferMaxQtyText').innerText = `من أصل ${item.quantity}`;
+    document.getElementById('transferQty').max = item.quantity;
+
+    new bootstrap.Modal(document.getElementById('transferModal')).show();
+}
+
+if (transferForm) {
+    transferForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const submitBtn = document.getElementById('transferSubmitBtn');
+        const toBranchId = document.getElementById('transferToBranch').value;
+        const toBranchName = document.getElementById('transferToBranch').options[document.getElementById('transferToBranch').selectedIndex].text;
+        const transferQty = parseInt(document.getElementById('transferQty').value);
+
+        if (!currentItemForTransfer) return;
+        if (transferQty > currentItemForTransfer.quantity) {
+            alert('الكمية المطلوبة أكبر من الرصيد المتاح!');
+            return;
+        }
+        if (toBranchId === currentItemForTransfer.branchId) {
+            alert('لا يمكن التحويل لنفس الفرع!');
+            return;
+        }
+
+        submitBtn.disabled = true;
+
+        try {
+            // 1. Deduct from source
+            const sourceRef = doc(db, "inventory", currentItemForTransfer.id);
+            const newSourceQty = (currentItemForTransfer.quantity || 0) - transferQty;
+
+            await updateDoc(sourceRef, {
+                quantity: newSourceQty,
+                updatedAt: Timestamp.now()
+            });
+
+            // 2. Check if item exists in target branch
+            const q = query(collection(db, "inventory"),
+                where("name", "==", currentItemForTransfer.name),
+                where("branchId", "==", toBranchId),
+                where("type", "==", currentItemForTransfer.type),
+                where("unit", "==", currentItemForTransfer.unit),
+                where("color", "==", currentItemForTransfer.color || '')
+            );
+            const targetSnapshot = await getDocs(q);
+
+            if (!targetSnapshot.empty) {
+                // Update existing item in target branch
+                const targetDoc = targetSnapshot.docs[0];
+                const targetData = targetDoc.data();
+                await updateDoc(doc(db, "inventory", targetDoc.id), {
+                    quantity: (targetData.quantity || 0) + transferQty,
+                    updatedAt: Timestamp.now()
+                });
+            } else {
+                // Create new entry for this item in target branch
+                // Clone the item object and remove specific internal fields
+                const newItemData = { ...currentItemForTransfer };
+                delete newItemData.id;
+
+                // Set the new branch and quantity
+                newItemData.quantity = transferQty;
+                newItemData.branchId = toBranchId;
+                newItemData.branchName = toBranchName;
+                newItemData.updatedAt = Timestamp.now();
+                newItemData.createdAt = Timestamp.now(); // Optional: keep original or reset
+
+                await addDoc(collection(db, "inventory"), newItemData);
+            }
+
+            alert('تم التحويل بنجاح!');
+            bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide();
+            await loadInventory();
+
+        } catch (error) {
+            console.error("Transfer Full Error:", error);
+            alert('حدث خطأ أثناء عملية التحويل: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
 }
 
 loadInventory();

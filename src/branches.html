@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة الفروع - نسيج</title>
+    <link rel="icon" type="image/png" href="assets/logo-favicon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h3 class="text-center fw-bold mb-4">نسيج <small style="font-size: 0.5em; display: block;">إدارة الفروع</small>
+        </h3>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link-custom" href="inventory.html"><i class="bi bi-box-seam ms-2"></i> المخزون</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom active" href="#"><i class="bi bi-geo-alt ms-2"></i> إدارة الفروع</a>
+            </li>
+            <li class="nav-item mt-5">
+                <a class="nav-link-custom text-danger" href="login.html" onclick="localStorage.clear()"><i
+                        class="bi bi-box-arrow-right ms-2"></i> تسجيل خروج</a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">إدارة الفروع والمخازن</h2>
+                <p class="text-muted">أضف وتحكم في فروع ومخازن المؤسسة</p>
+            </div>
+            <button class="btn btn-primary px-4 py-2 fw-bold" data-bs-toggle="modal" data-bs-target="#addBranchModal">
+                <i class="bi bi-plus-lg ms-2"></i> إضافة فرع جديد
+            </button>
+        </header>
+
+        <!-- Branches Table -->
+        <div class="card table-custom p-4">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr>
+                            <th>اسم الفرع / المستودع</th>
+                            <th>الموقع / العنوان</th>
+                            <th>النوع</th>
+                            <th>تاريخ الإضافة</th>
+                            <th>تحكم</th>
+                        </tr>
+                    </thead>
+                    <tbody id="branchesTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center py-4">جاري تحميل الفروع...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Branch Modal -->
+    <div class="modal fade" id="addBranchModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">إضافة فرع جديد</h5>
+                    <button type="button" class="btn-close ms-auto me-0" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addBranchForm">
+                        <div class="mb-3">
+                            <label class="form-label">اسم الفرع / المستودع</label>
+                            <input type="text" class="form-control" id="branchName"
+                                placeholder="مثال: مخزن القاهرة الرئيسي" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">الموقع / العنوان</label>
+                            <input type="text" class="form-control" id="branchLocation" placeholder="العنوان بالتفصيل">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">النوع</label>
+                            <select class="form-select" id="branchType">
+                                <option value="warehouse">مخزن / مستودع</option>
+                                <option value="branch">فرع بيع</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mt-3" id="branchSubmitBtn">حفظ
+                            الفرع</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Branch Modal -->
+    <div class="modal fade" id="editBranchModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">تعديل بيانات الفرع</h5>
+                    <button type="button" class="btn-close ms-auto me-0" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editBranchForm">
+                        <input type="hidden" id="editBranchId">
+                        <div class="mb-3">
+                            <label class="form-label">اسم الفرع / المستودع</label>
+                            <input type="text" class="form-control" id="editBranchName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">الموقع / العنوان</label>
+                            <input type="text" class="form-control" id="editBranchLocation">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">النوع</label>
+                            <select class="form-select" id="editBranchType">
+                                <option value="warehouse">مخزن / مستودع</option>
+                                <option value="branch">فرع بيع</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold mt-3"
+                            id="editBranchSubmitBtn">حفظ التغييرات</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/branches.js"></script>
+</body>
+
+</html>
