@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 window.inventoryStore = {};
-import { collection, addDoc, getDocs, query, where, Timestamp, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, addDoc, getDocs, query, where, Timestamp, deleteDoc, doc, updateDoc, orderBy, limit, startAfter, startAt, endBefore, limitToLast, or, and, getCountFromServer, getAggregateFromServer, sum, average, count } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // === DOM Elements ===
 const tableBody = document.getElementById('inventory-table-body');
@@ -10,93 +10,219 @@ const totalItemsEl = document.getElementById('total-items');
 const totalValueEl = document.getElementById('total-value');
 const lowStockEl = document.getElementById('low-stock-count');
 
+// --- Filter/Search Elements ---
+const searchInput = document.getElementById('searchInput');
+const filterBranchSelect = document.getElementById('filterBranch');
+const sortOptionsSelect = document.getElementById('sortOptions');
+const applyFiltersBtn = document.getElementById('applyFilters');
+const resetFiltersBtn = document.getElementById('resetFilters');
+const prevPageBtn = document.getElementById('prevPage');
+const nextPageBtn = document.getElementById('nextPage');
+const totalResultsEl = document.getElementById('total-results');
+
 // --- Branch Selectors ---
 const itemBranchSelect = document.getElementById('itemBranch');
 const editItemBranchSelect = document.getElementById('editItemBranch');
 const transferToBranchSelect = document.getElementById('transferToBranch');
 const transferForm = document.getElementById('transferForm');
 
-// === Load Inventory ===
-async function loadInventory() {
+// --- Global State ---
+let lastVisible = null;
+let firstVisible = null;
+let pageStack = [];
+let pageSize = 10;
+let currentFilters = {
+    search: '',
+    branchId: '',
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
+};
+
+// === Load Stats (Global) ===
+// === Load Stats (Server-Side Control) ===
+async function updateStats() {
+    try {
+        let qStats = collection(db, "inventory");
+        let constraints = [];
+
+        if (currentFilters.branchId) {
+            constraints.push(where("branchId", "==", currentFilters.branchId));
+        }
+
+        if (currentFilters.search) {
+            const val = currentFilters.search.trim();
+            if (/^\d{5,}$/.test(val)) {
+                constraints.push(where("barcode", ">=", val), where("barcode", "<=", val + "\uf8ff"));
+            } else {
+                constraints.push(where("name", ">=", val), where("name", "<=", val + "\uf8ff"));
+            }
+        }
+
+        const aggQuery = query(qStats, ...constraints);
+        const aggSnap = await getAggregateFromServer(aggQuery, { sQty: sum('quantity') });
+        if (totalItemsEl) totalItemsEl.innerText = (aggSnap.data().sQty || 0).toLocaleString();
+
+        const statsQuery = await getDocs(aggQuery);
+        let tVal = 0;
+        let lStock = 0;
+
+        statsQuery.forEach(doc => {
+            const data = doc.data();
+            const qty = parseInt(data.quantity || 0);
+            const cost = parseFloat(data.cost || 0);
+            const minQty = parseInt(data.minQuantity || 0);
+
+            tVal += (qty * cost);
+            if (qty <= minQty) lStock++;
+        });
+
+        if (totalValueEl) totalValueEl.innerText = tVal.toLocaleString() + ' ج.م';
+        if (lowStockEl) lowStockEl.innerText = lStock.toLocaleString();
+    } catch (error) {
+        console.error("Stats Error:", error);
+    }
+}
+
+// === Load Inventory (Universal Sorting) ===
+async function loadInventory(direction = 'first') {
     if (!tableBody) return;
-    tableBody.innerHTML = '<tr><td colspan="7" class="text-center">جاري التحميل...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="9" class="text-center">جاري التحميل...</td></tr>';
 
     try {
-        const querySnapshot = await getDocs(collection(db, "inventory"));
+        updateStats(); // Refresh summary cards based on new filters
+        let q = collection(db, "inventory");
+        let constraints = [];
+        let isBarcodeSearch = false;
+
+        // 1. Filter by Branch
+        if (currentFilters.branchId) {
+            constraints.push(where("branchId", "==", currentFilters.branchId));
+        }
+
+        // 2. Search Logic
+        if (currentFilters.search) {
+            const searchVal = currentFilters.search.trim();
+            if (/^\d{5,}$/.test(searchVal)) {
+                constraints.push(where("barcode", ">=", searchVal));
+                constraints.push(where("barcode", "<=", searchVal + "\uf8ff"));
+                isBarcodeSearch = true;
+            } else {
+                constraints.push(where("name", ">=", searchVal));
+                constraints.push(where("name", "<=", searchVal + "\uf8ff"));
+                constraints.push(orderBy("name", "asc"));
+            }
+        } else {
+            constraints.push(orderBy(currentFilters.sortBy, currentFilters.sortOrder));
+        }
+
+        if (!isBarcodeSearch) constraints.push(limit(pageSize + 1));
+
+        // 4. Pagination
+        if (!isBarcodeSearch) {
+            if (direction === 'next' && lastVisible) {
+                pageStack.push(firstVisible);
+                constraints.push(startAfter(lastVisible));
+            } else if (direction === 'prev' && pageStack.length > 0) {
+                const prevFirstDoc = pageStack.pop();
+                constraints.push(startAt(prevFirstDoc));
+            } else if (direction === 'first') {
+                pageStack = [];
+            }
+        }
+
+        const querySnapshot = await getDocs(query(q, ...constraints));
+
+        if (querySnapshot.empty) {
+            tableBody.innerHTML = '<tr><td colspan="9" class="text-center">لا توجد نتائج</td></tr>';
+            if (nextPageBtn) nextPageBtn.disabled = true;
+            if (totalResultsEl) totalResultsEl.innerText = "0";
+            return;
+        }
+
+        let results = [];
+        querySnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data(), _snapshot: doc }));
+
+        // JavaScript Fallback Sort (For Barcode searches ONLY)
+        if (isBarcodeSearch) {
+            const field = currentFilters.sortBy;
+            const order = currentFilters.sortOrder;
+            results.sort((a, b) => {
+                let valA = a[field];
+                let valB = b[field];
+                if (typeof valA === 'string') return order === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                return order === 'asc' ? valA - valB : valB - valA;
+            });
+        }
+
+        // Detect Next Page
+        const hasNextPage = !isBarcodeSearch && results.length > pageSize;
+        const displayResults = hasNextPage ? results.slice(0, pageSize) : results;
+
+        firstVisible = displayResults[0]._snapshot;
+        lastVisible = displayResults[displayResults.length - 1]._snapshot;
+
+        if (nextPageBtn) nextPageBtn.disabled = !hasNextPage;
+        if (prevPageBtn) prevPageBtn.disabled = pageStack.length === 0;
 
         let html = '';
-        let totalCount = 0;
-        let totalVal = 0;
-        let lowStock = 0;
-
-        // Fetch all branches first for lookup (or cache them)
-        const branchesSnap = await getDocs(collection(db, "branches"));
-        const branchMap = {};
-        branchesSnap.forEach(b => branchMap[b.id] = b.data().name);
-
-        // Populate branch dropdowns
-        populateBranchDropdowns(branchesSnap);
-
-        querySnapshot.forEach((docSnapshot) => {
-            const data = docSnapshot.data();
-            const id = docSnapshot.id;
+        window.inventoryStore = {};
+        displayResults.forEach((data) => {
+            const id = data.id;
             const isLow = data.quantity <= (data.minQuantity || 0);
-
-            // Store for reuse
-            window.inventoryStore[id] = { id, ...data };
-
-            if (isLow) lowStock++;
-            totalCount += parseInt(data.quantity || 0);
-            totalVal += (parseInt(data.quantity || 0) * parseFloat(data.cost || 0));
+            window.inventoryStore[id] = data;
 
             html += `
                 <tr class="${isLow ? 'table-danger' : ''}">
-                    <td><small>${data.barcode || id.substr(0, 5)}</small></td>
+                    <td><small>${data.barcode}</small></td>
                     <td>${data.name}</td>
                     <td>
-                        ${data.type === 'raw' ? '<span class="badge bg-secondary">خام</span>' : '<span class="badge bg-success">منتج تام</span>'}
+                        <span class="badge ${data.type === 'raw' ? 'bg-secondary' : 'bg-success'}">${data.type === 'raw' ? 'خام' : 'منتج تام'}</span>
                         <small class="d-block text-muted">${data.unit || ''}</small>
                     </td>
-                    <td><small class="text-muted">${data.color || '-'}</small></td>
+                    <td><small>${data.color || '-'}</small></td>
                     <td><span class="badge bg-light text-dark border">${data.branchName || '-'}</span></td>
                     <td class="fw-bold">${data.quantity}</td>
                     <td>${data.minQuantity || 0}</td>
                     <td>${data.cost} ج.م</td>
                     <td>
                         <div class="btn-group" dir="ltr">
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('${id}')" title="حذف"><i class="bi bi-trash"></i></button>
-                            <button class="btn btn-sm btn-outline-info" onclick="openEditModal('${id}')" title="تعديل"><i class="bi bi-pencil"></i></button>
-                            <button class="btn btn-sm btn-outline-primary" onclick="printBarcode('${data.barcode}')" title="طباعة"><i class="bi bi-printer"></i></button>
-                            <button class="btn btn-sm btn-outline-warning" onclick="openTransferModal('${id}')" title="تحويل"><i class="bi bi-arrow-left-right"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('${id}')"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-info" onclick="openEditModal('${id}')"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="printBarcode('${data.barcode}')"><i class="bi bi-printer"></i></button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="openTransferModal('${id}')"><i class="bi bi-arrow-left-right"></i></button>
                         </div>
                     </td>
                 </tr>
             `;
         });
 
-        tableBody.innerHTML = html || '<tr><td colspan="8" class="text-center">لا توجد أصناف</td></tr>';
-
-        // Update Stats
-        if (totalItemsEl) totalItemsEl.innerText = totalCount;
-        if (totalValueEl) totalValueEl.innerText = totalVal.toLocaleString() + ' ج.م';
-        if (lowStockEl) lowStockEl.innerText = lowStock;
-
+        tableBody.innerHTML = html;
+        if (totalResultsEl) {
+            const start = isBarcodeSearch ? 1 : (pageStack.length * pageSize) + 1;
+            const end = isBarcodeSearch ? displayResults.length : (pageStack.length * pageSize) + displayResults.length;
+            totalResultsEl.innerText = `${start} - ${end}`;
+        }
     } catch (error) {
-        console.error("Error loading inventory:", error);
-        if (tableBody) tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">خطأ في تحميل البيانات</td></tr>';
+        console.error("Load Error:", error);
+        tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger p-4">حدث خطأ: ${error.message}</td></tr>`;
     }
 }
 
+
 function populateBranchDropdowns(branchesSnap) {
     let options = '<option value="" disabled selected>اختر الفرع...</option>';
+    let filterOptions = '<option value="">كل الفروع</option>';
+
     branchesSnap.forEach(doc => {
-        options += `<option value="${doc.id}">${doc.data().name}</option>`;
+        const b = doc.data();
+        options += `<option value="${doc.id}">${b.name}</option>`;
+        filterOptions += `<option value="${doc.id}">${b.name}</option>`;
     });
+
     if (itemBranchSelect) itemBranchSelect.innerHTML = options;
     if (editItemBranchSelect) editItemBranchSelect.innerHTML = options;
-
-    // For transfer, usually we exclude the current branch but simpler to just show all for now or filter in JS
     if (transferToBranchSelect) transferToBranchSelect.innerHTML = options;
+    if (filterBranchSelect) filterBranchSelect.innerHTML = filterOptions;
 }
 
 // === Helper: Generate Barcode ===
@@ -418,4 +544,69 @@ if (transferForm) {
     });
 }
 
-loadInventory();
+// === Event Listeners for Filters & Pagination ===
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        currentFilters.search = e.target.value;
+    });
+    // Support for barcode scanners which usually append an Enter/Tab key
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            currentFilters.search = e.target.value;
+            loadInventory('first');
+        }
+    });
+}
+
+if (filterBranchSelect) {
+    filterBranchSelect.addEventListener('change', (e) => {
+        currentFilters.branchId = e.target.value;
+    });
+}
+
+if (sortOptionsSelect) {
+    sortOptionsSelect.addEventListener('change', (e) => {
+        const [field, order] = e.target.value.split('_');
+        currentFilters.sortBy = field;
+        currentFilters.sortOrder = order;
+    });
+}
+
+if (applyFiltersBtn) {
+    applyFiltersBtn.addEventListener('click', () => {
+        loadInventory('first');
+    });
+}
+
+if (resetFiltersBtn) {
+    resetFiltersBtn.addEventListener('click', () => {
+        currentFilters = { search: '', branchId: '', sortBy: 'createdAt', sortOrder: 'desc' };
+        if (searchInput) searchInput.value = '';
+        if (filterBranchSelect) filterBranchSelect.value = '';
+        if (sortOptionsSelect) sortOptionsSelect.value = 'createdAt_desc';
+        loadInventory('first');
+    });
+}
+
+if (nextPageBtn) {
+    nextPageBtn.addEventListener('click', () => loadInventory('next'));
+}
+
+if (prevPageBtn) {
+    prevPageBtn.addEventListener('click', () => loadInventory('prev'));
+}
+
+// === Load Branches ===
+async function initBranches() {
+    try {
+        const branchesSnap = await getDocs(collection(db, "branches"));
+        populateBranchDropdowns(branchesSnap);
+    } catch (error) {
+        console.error("Branches Load Error:", error);
+    }
+}
+
+// Initial Load
+initBranches();
+updateStats();
+loadInventory('first');
