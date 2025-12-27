@@ -20,7 +20,7 @@ body {
     background: rgba(255, 255, 255, 0.95);
     padding: 40px;
     border-radius: 20px;
-    box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
     width: 100%;
     max-width: 380px;
     text-align: center;
@@ -125,13 +125,40 @@ body {
 
 .stat-card {
     border: none;
-    border-radius: 15px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
-    transition: transform 0.3s;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #fff;
+    overflow: hidden;
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-8px);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.12);
+}
+
+.icon-container {
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+}
+
+.bg-grad-primary {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    box-shadow: 0 10px 20px rgba(79, 172, 254, 0.3);
+}
+
+.bg-grad-success {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    box-shadow: 0 10px 20px rgba(67, 233, 123, 0.3);
+}
+
+.bg-grad-warning {
+    background: linear-gradient(135deg, #f9d423 0%, #ff4e50 100%);
+    box-shadow: 0 10px 20px rgba(249, 212, 35, 0.3);
 }
 
 .table-custom {

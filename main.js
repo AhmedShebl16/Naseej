@@ -11,7 +11,7 @@ function createWindow() {
             enableRemoteModule: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        icon: path.join(__dirname, 'src/assets/icon.png') // Path updated to src/assets
+        icon: path.join(__dirname, 'src/assets/logo-favicon.png')
     });
 
     win.setMenuBarVisibility(false); // Hide default menu bar
