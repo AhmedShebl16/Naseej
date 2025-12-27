@@ -11,11 +11,11 @@ function createWindow() {
             enableRemoteModule: true,
             preload: path.join(__dirname, 'preload.js')
         },
-        icon: path.join(__dirname, 'assets/icon.png') // Assumption: icon will be added later
+        icon: path.join(__dirname, 'src/assets/icon.png') // Path updated to src/assets
     });
 
     win.setMenuBarVisibility(false); // Hide default menu bar
-    win.loadFile('login.html');
+    win.loadFile(path.join(__dirname, 'src/login.html')); // Path updated to src/login.html
 }
 
 app.whenReady().then(() => {
