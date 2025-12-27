@@ -1,4 +1,4 @@
-# Naseej (باترون) - Hybrid ERP/POS System
+# Naseej (نسيج) - Hybrid ERP/POS System
 
 Naseej is a hybrid ERP and POS system designed for clothing factories and tailoring shops.
 
