@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة المخزون - نسيج</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .sidebar {
+            height: 100vh;
+            background-color: #1e3c72;
+            /* Dark Blue */
+            color: #fff;
+            padding-top: 20px;
+            position: fixed;
+            right: 0;
+            width: 250px;
+        }
+
+        .main-content {
+            margin-right: 250px;
+            padding: 20px;
+        }
+
+        .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 15px 20px;
+            border-right: 4px solid transparent;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-right-color: #ffc107;
+            /* Gold accent */
+        }
+
+        .stat-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .table-custom {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .table-custom thead {
+            background-color: #1e3c72;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h3 class="text-center fw-bold mb-4">نسيج <small style="font-size: 0.5em; display: block;">إدارة المخزون</small>
+        </h3>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link active" href="#" id="nav-raw"><i class="bi bi-box-seam ms-2"></i> الخامات (Raw)</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" id="nav-finished"><i class="bi bi-tags ms-2"></i> المنتج التام</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" href="#" id="nav-alerts"><i class="bi bi-exclamation-triangle ms-2"></i> النواقص</a>
+            </li>
+            <li class="nav-item mt-5">
+                <a class="nav-link text-danger" href="login.html" onclick="localStorage.clear()"><i
+                        class="bi bi-box-arrow-right ms-2"></i> تسجيل خروج</a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-dark" id="page-title">مخزون الخامات</h2>
+            <div class="d-flex gap-2">
+                <input type="text" id="barcodeInput" class="form-control" placeholder="اسكان الباركود..."
+                    style="width: 300px;" autofocus>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                    <i class="bi bi-plus-lg"></i> إضافة صنف جديد
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Row -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card stat-card p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-primary text-white rounded-circle p-3 ms-3">
+                            <i class="bi bi-layers-fill h4 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">إجمالي الأصناف</h6>
+                            <h3 class="fw-bold mb-0" id="total-items">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-success text-white rounded-circle p-3 ms-3">
+                            <i class="bi bi-currency-dollar h4 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">القيمة الإجمالية</h6>
+                            <h3 class="fw-bold mb-0" id="total-value">0 ج.م</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card p-3">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-warning text-white rounded-circle p-3 ms-3">
+                            <i class="bi bi-exclamation-circle h4 mb-0"></i>
+                        </div>
+                        <div>
+                            <h6 class="text-muted mb-1">تنبيهات النواقص</h6>
+                            <h3 class="fw-bold mb-0" id="low-stock-count">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Table -->
+        <div class="table-custom">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>اسم الصنف</th>
+                        <th>النوع</th>
+                        <th>الكمية الحالية</th>
+                        <th>حد الطلب</th>
+                        <th>السعر (Cost)</th>
+                        <th>تحكم</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-table-body">
+                    <!-- Rows will be populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Item Modal -->
+    <div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">إضافة صنف جديد</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addItemForm">
+                        <div class="mb-3">
+                            <label class="form-label">اسم الصنف</label>
+                            <input type="text" class="form-control" id="itemName" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">النوع</label>
+                                <select class="form-select" id="itemType">
+                                    <option value="raw">خام (قماش/خيوط)</option>
+                                    <option value="finished">منتج تام</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">وحدة القياس</label>
+                                <select class="form-select" id="itemUnit">
+                                    <option value="meter">متر</option>
+                                    <option value="kg">كجم</option>
+                                    <option value="piece">قطعة</option>
+                                    <option value="roll">رول</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">الكمية</label>
+                                <input type="number" class="form-control" id="itemQty" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">حد الطلب (Alert)</label>
+                                <input type="number" class="form-control" id="itemMinQty" value="10">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">سعر التكلفة</label>
+                            <input type="number" class="form-control" id="itemCost" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">حفظ</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanned Item Details Modal -->
+    <div class="modal fade" id="scanModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content text-center">
+                <div class="modal-header bg-light justify-content-center">
+                    <h5 class="modal-title fw-bold">تفاصيل المنتج</h5>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="display-1 text-primary mb-3"><i class="bi bi-box-seam"></i></div>
+                    <h3 class="fw-bold mb-1" id="scanName">...</h3>
+                    <p class="text-muted" id="scanBarcode">...</p>
+
+                    <div class="row mt-4">
+                        <div class="col-6 text-end border-start">
+                            <small class="text-muted">السعر (Cost)</small>
+                            <h4 class="fw-bold text-success" id="scanCost">0 ج.م</h4>
+                        </div>
+                        <div class="col-6 text-start">
+                            <small class="text-muted">الكمية الحالية</small>
+                            <h4 class="fw-bold" id="scanQty">0</h4>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row mt-2">
+                        <div class="col-6 text-end border-start">
+                            <small class="text-muted">النوع</small>
+                            <h5 id="scanType">-</h5>
+                        </div>
+                        <div class="col-6 text-start">
+                            <small class="text-muted">الوحدة</small>
+                            <h5 id="scanUnit">-</h5>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary w-50" data-bs-dismiss="modal">إغلاق</button>
+                    <!-- Beep Sound for success -->
+                    <audio id="beepSound" src="assets/beep.mp3"></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script type="module" src="js/inventory.js"></script>
+</body>
+
+</html>

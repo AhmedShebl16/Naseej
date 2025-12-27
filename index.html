@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة التحكم - نسيج</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .dashboard-card {
+            transition: 0.3s;
+            cursor: pointer;
+        }
+
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body class="p-4">
+
+    <div class="container">
+        <header class="d-flex justify-content-between align-items-center mb-5 border-bottom pb-3">
+            <h1 class="fw-bold text-primary">لوحة القيادة (Admin)</h1>
+            <button class="btn btn-danger" onclick="logout()">تسجيل خروج</button>
+        </header>
+
+        <div class="row g-4">
+            <!-- Inventory Module -->
+            <div class="col-md-4">
+                <div class="card dashboard-card bg-primary text-white h-100"
+                    onclick="window.location.href='inventory.html'">
+                    <div class="card-body text-center d-flex flex-column justify-content-center">
+                        <i class="bi bi-box-seam display-1 mb-3"></i>
+                        <h3>إدارة المخزون</h3>
+                        <p class="opacity-75">الخامات، المنتج التام، النواقص</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POS Module -->
+            <div class="col-md-4">
+                <div class="card dashboard-card bg-success text-white h-100" onclick="window.location.href='pos.html'">
+                    <div class="card-body text-center d-flex flex-column justify-content-center">
+                        <i class="bi bi-cart4 display-1 mb-3"></i>
+                        <h3>نقطة البيع (POS)</h3>
+                        <p class="opacity-75">البيع، الفواتير، العملاء</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports Module -->
+            <div class="col-md-4">
+                <div class="card dashboard-card bg-warning text-dark h-100">
+                    <div class="card-body text-center d-flex flex-column justify-content-center">
+                        <i class="bi bi-graph-up-arrow display-1 mb-3"></i>
+                        <h3>التقارير المالية</h3>
+                        <p class="opacity-75">الأرباح، الخسائر، الخزينة</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+
+</html>
