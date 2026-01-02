@@ -4,12 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة المستخدمين - نسيج</title>
+    <title>إدارة العملاء - نسيج</title>
     <link rel="icon" type="image/png" href="assets/logo-favicon.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-
     <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -17,8 +16,7 @@
 
     <!-- Sidebar -->
     <div class="sidebar">
-        <h3 class="text-center fw-bold mb-4">نسيج <small style="font-size: 0.5em; display: block;">إدارة
-                المستخدمين</small>
+        <h3 class="text-center fw-bold mb-4">نسيج <small style="font-size: 0.5em; display: block;">إدارة العملاء</small>
         </h3>
         <ul class="nav flex-column">
             <li class="nav-item">
@@ -38,11 +36,11 @@
                 <a class="nav-link-custom" href="branches.html"><i class="bi bi-geo-alt ms-2"></i> إدارة الفروع</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link-custom" href="customers.html"><i class="bi bi-people-fill ms-2"></i> العملاء</a>
+                <a class="nav-link-custom active" href="customers.html"><i class="bi bi-people-fill ms-2"></i>
+                    العملاء</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link-custom active" href="users.html"><i class="bi bi-people ms-2"></i> إدارة
-                    المستخدمين</a>
+                <a class="nav-link-custom" href="users.html"><i class="bi bi-people ms-2"></i> إدارة المستخدمين</a>
             </li>
             <li class="nav-item mt-5">
                 <a class="nav-link-custom text-danger" href="login.html" onclick="localStorage.clear()"><i
@@ -54,11 +52,30 @@
     <!-- Main Content -->
     <div class="main-content">
         <header class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold text-dark">إدارة المستخدمين</h2>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                <i class="bi bi-person-plus-fill"></i> إضافة مستخدم جديد
-            </button>
+            <h2 class="fw-bold text-dark">إدارة العملاء</h2>
+            <div class="d-flex gap-2">
+                <input type="file" id="excelUpload" accept=".xlsx, .xls" hidden>
+                <button class="btn btn-success" onclick="document.getElementById('excelUpload').click()">
+                    <i class="bi bi-file-earmark-spreadsheet"></i> رفع ملف إكسل
+                </button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
+                    <i class="bi bi-person-plus-fill"></i> إضافة عميل جديد
+                </button>
+            </div>
         </header>
+
+        <div class="card p-3 mb-4">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i
+                                class="bi bi-search text-muted"></i></span>
+                        <input type="text" id="searchCustomerInput" class="form-control border-start-0 ps-0"
+                            placeholder="بحث باسم العميل أو رقم الهاتف...">
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div class="row mb-4">
             <div class="col-md-4">
@@ -68,112 +85,91 @@
                             <i class="bi bi-people h3 mb-0"></i>
                         </div>
                         <div>
-                            <h6 class="text-muted mb-1 fw-bold">إجمالي المستخدمين</h6>
-                            <h2 class="fw-bold mb-0 text-dark" id="total-users">0</h2>
+                            <h6 class="text-muted mb-1 fw-bold">إجمالي العملاء</h6>
+                            <h2 class="fw-bold mb-0 text-dark" id="total-customers">0</h2>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Users Table -->
+        <!-- Customers Table -->
         <div class="table-custom">
             <table class="table table-hover mb-0">
                 <thead>
                     <tr>
-                        <th>الاسم</th>
-                        <th>اسم المستخدم</th>
-                        <th>الوظيفة / الدور</th>
-                        <th>الفرع</th>
+                        <th>اسم العميل</th>
+                        <th>رقم الهاتف</th>
                         <th>تاريخ الإضافة</th>
                         <th>تحكم</th>
                     </tr>
                 </thead>
-                <tbody id="users-table-body">
+                <tbody id="customers-table-body">
                     <!-- Rows will be populated by JS -->
                 </tbody>
             </table>
         </div>
+
+        <!-- Pagination Controls -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted" id="page-info">صفحة 1</span>
+            <div class="btn-group">
+                <button class="btn btn-outline-secondary" id="prevPageBtn" disabled>
+                    <i class="bi bi-chevron-right"></i> السابق
+                </button>
+                <button class="btn btn-outline-secondary" id="nextPageBtn">
+                    التالي <i class="bi bi-chevron-left"></i>
+                </button>
+            </div>
+        </div>
     </div>
 
-    <!-- Add User Modal -->
-    <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+    <!-- Add Customer Modal -->
+    <div class="modal fade" id="addCustomerModal" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title fw-bold">إضافة مستخدم جديد</h5>
+                    <h5 class="modal-title fw-bold">إضافة عميل جديد</h5>
                     <button type="button" class="btn-close ms-auto me-0" data-bs-dismiss="modal"
                         aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addUserForm">
+                    <form id="addCustomerForm">
                         <div class="mb-3">
-                            <label class="form-label">الاسم بالكامل</label>
-                            <input type="text" class="form-control" id="userName" required>
+                            <label class="form-label">اسم العميل</label>
+                            <input type="text" class="form-control" id="customerName" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">اسم المستخدم</label>
-                            <input type="text" class="form-control" id="userUsername" required>
+                            <label class="form-label">رقم الهاتف</label>
+                            <input type="tel" class="form-control" id="customerPhone" dir="ltr"
+                                placeholder="01xxxxxxxxx" required>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">كلمة المرور</label>
-                            <input type="password" class="form-control" id="userPassword" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الدور / الصلاحية</label>
-                            <select class="form-select" id="userRole" required>
-                                <option value="" disabled selected>اختر الدور...</option>
-                                <option value="admin">أدمن (Admin)</option>
-                                <option value="store_manager">مسؤول مخازن</option>
-                                <option value="cashier">كاشير</option>
-                                <option value="tailor">فني (Tailor)</option>
-                                <option value="branch_admin">إداري فروع</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الفرع (اختياري)</label>
-                            <select class="form-select" id="userBranch">
-                                <option value="">كل الفروع / غير محدد</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">حفظ المستخدم</button>
+                        <button type="submit" class="btn btn-primary w-100">حفظ العميل</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Edit User Modal -->
-    <div class="modal fade" id="editUserModal" tabindex="-1" aria-hidden="true">
+    <!-- Edit Customer Modal -->
+    <div class="modal fade" id="editCustomerModal" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fw-bold">تعديل بيانات المستخدم</h5>
+                    <h5 class="modal-title fw-bold">تعديل بيانات العميل</h5>
                     <button type="button" class="btn-close btn-close-white ms-auto me-0" data-bs-dismiss="modal"
                         aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="editUserForm">
-                        <input type="hidden" id="editUserId">
+                    <form id="editCustomerForm">
+                        <input type="hidden" id="editCustomerId">
                         <div class="mb-3">
-                            <label class="form-label">الاسم بالكامل</label>
-                            <input type="text" class="form-control" id="editUserName" required>
+                            <label class="form-label">اسم العميل</label>
+                            <input type="text" class="form-control" id="editCustomerName" required>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">الدور / الصلاحية</label>
-                            <select class="form-select" id="editUserRole" required>
-                                <option value="admin">أدمن (Admin)</option>
-                                <option value="store_manager">مسؤول مخازن</option>
-                                <option value="cashier">كاشير</option>
-                                <option value="tailor">فني (Tailor)</option>
-                                <option value="branch_admin">إداري فروع</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">الفرع (اختياري)</label>
-                            <select class="form-select" id="editUserBranch">
-                                <option value="">كل الفروع / غير محدد</option>
-                            </select>
+                            <label class="form-label">رقم الهاتف</label>
+                            <input type="tel" class="form-control" id="editCustomerPhone" dir="ltr" required>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">حفظ التعديلات</button>
                     </form>
@@ -182,7 +178,7 @@
         </div>
     </div>
 
-    <!-- Toast Container for non-blocking notifications -->
+    <!-- Toast Container -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div id="appToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive"
             aria-atomic="true">
@@ -196,8 +192,19 @@
         </div>
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay"
+        class="position-fixed top-0 start-0 w-100 h-100 bg-white bg-opacity-75 d-none justify-content-center align-items-center"
+        style="z-index: 2000;">
+        <div class="text-center">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <h5 id="loadingMessage">جاري المعالجة...</h5>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="js/users.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script type="module" src="js/customers.js"></script>
 </body>
 
 </html>
