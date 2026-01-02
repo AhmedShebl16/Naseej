@@ -76,17 +76,19 @@ if (loginForm) {
 
                 // 1. Save user data to LocalStorage
                 localStorage.setItem('userRole', userData.role);
-                localStorage.setItem('fullName', userData.fullName || userIn);
+                localStorage.setItem('username', userData.username);
+                localStorage.setItem('fullName', userData.name || userIn);
+                localStorage.setItem('branchId', userData.branchId || '');
+                localStorage.setItem('branchName', userData.branchName || '');
 
                 // 2. Redirect based on Role
-                if (userData.role === 'superadmin') {
-                    window.location.href = 'index.html';
+                if (userData.role === 'cashier' || userData.role === 'sales') {
+                    window.location.href = 'pos.html';
                 } else if (userData.role === 'inventory') {
                     window.location.href = 'inventory.html';
-                } else if (userData.role === 'sales') {
-                    window.location.href = 'pos.html'; // Placeholder for now
                 } else {
-                    window.location.href = 'index.html'; // Fallback
+                    // superadmin, admin, manager, or unknown
+                    window.location.href = 'index.html';
                 }
 
             } else {

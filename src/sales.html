@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سجل المبيعات - نسيج</title>
+    <link rel="icon" type="image/png" href="assets/logo-favicon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h3 class="text-center fw-bold mb-4">نسيج <small style="font-size: 0.5em; display: block;">المبيعات</small>
+        </h3>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link-custom" href="index.html"><i class="bi bi-speedometer2 ms-2"></i> لوحة القيادة</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="inventory.html"><i class="bi bi-box-seam ms-2"></i> إدارة المخزون</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="pos.html"><i class="bi bi-cart4 ms-2"></i> نقطة البيع</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom active" href="sales.html"><i class="bi bi-receipt ms-2"></i> المبيعات</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="branches.html"><i class="bi bi-geo-alt ms-2"></i> إدارة الفروع</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="customers.html"><i class="bi bi-people-fill ms-2"></i> العملاء</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="users.html"><i class="bi bi-people ms-2"></i> إدارة المستخدمين</a>
+            </li>
+            <li class="nav-item mt-5">
+                <a class="nav-link-custom text-danger" href="login.html" onclick="localStorage.clear()"><i
+                        class="bi bi-box-arrow-right ms-2"></i> تسجيل خروج</a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold text-dark">سجل المبيعات</h2>
+            <!-- <button class="btn btn-outline-primary"><i class="bi bi-printer"></i> طباعة تقرير</button> -->
+        </header>
+
+        <!-- Stats / Filters -->
+        <div class="card p-3 mb-4">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                        <input type="text" id="salesSearchInput" class="form-control"
+                            placeholder="بحث برقم العميل أو الاسم...">
+                    </div>
+                </div>
+                <!-- Add Date Range later if needed -->
+            </div>
+        </div>
+
+        <!-- Sales Table -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="bg-light sticky-top">
+                        <tr>
+                            <th class="py-3 ps-4">التاريخ</th>
+                            <th class="py-3">العميل</th>
+                            <th class="py-3">عدد الأصناف</th>
+                            <th class="py-3">الإجمالي</th>
+                            <th class="py-3">بواسطة</th>
+                            <th class="py-3">تفاصيل</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sales-table-body">
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <span class="spinner-border text-primary"></span>
+                                <p class="mb-0 mt-2 text-muted">جاري تحميل البيانات...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Padding for scroll -->
+            <div class="p-2"></div>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted" id="page-info">صفحة 1</span>
+            <div class="btn-group">
+                <button class="btn btn-outline-secondary" id="prevPageBtn" disabled>
+                    <i class="bi bi-chevron-right"></i> السابق
+                </button>
+                <button class="btn btn-outline-secondary" id="nextPageBtn">
+                    التالي <i class="bi bi-chevron-left"></i>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Sale Details Modal -->
+    <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">تفاصيل الفاتورة</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <div>
+                            <small class="text-muted d-block">العميل</small>
+                            <span class="fw-bold" id="detailCustomerName">-</span>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">رقم الهاتف</small>
+                            <span class="fw-bold" id="detailCustomerPhone">-</span>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">التاريخ</small>
+                            <span class="fw-bold" id="detailDate">-</span>
+                        </div>
+                    </div>
+
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>الصنف</th>
+                                <th>السعر</th>
+                                <th>الكمية</th>
+                                <th>الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailItemsBody"></tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">الإجمالي الكلي:</td>
+                                <td class="fw-bold text-primary" id="detailTotalAmount">0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <!-- <div class="modal-footer">
+                    <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> طباعة</button>
+                </div> -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/sales.js"></script>
+</body>
+
+</html>
