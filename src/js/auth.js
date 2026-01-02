@@ -1,8 +1,40 @@
 import { db } from "./firebase-config.js";
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, query, where, getDocs, addDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // === Login Logic ===
 const loginForm = document.getElementById('loginForm');
+const setupAdminBtn = document.getElementById('setupAdminBtn');
+
+if (setupAdminBtn) {
+    setupAdminBtn.addEventListener('click', async () => {
+        if (!confirm('Create default Admin user (admin/123)?')) return;
+
+        try {
+            // Check if any user exists
+            const snap = await getDocs(collection(db, "users"));
+            if (!snap.empty) {
+                alert("Users already exist! Cannot create default admin.");
+                return;
+            }
+
+            await addDoc(collection(db, "users"), {
+                name: "Admin System",
+                username: "admin",
+                password: "123",
+                role: "admin",
+                branchId: "",
+                branchName: "Main Branch",
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+
+            alert("Admin Created! Login with: admin / 123");
+        } catch (error) {
+            console.error(error);
+            alert("Error: " + error.message);
+        }
+    });
+}
 const loginBtn = document.getElementById('loginBtn');
 const errorBox = document.getElementById('loginError');
 

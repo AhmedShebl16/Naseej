@@ -378,14 +378,20 @@ window.deleteCustomer = async function (id) {
     }
 };
 
-// === Search Listener (Debounced) ===
-let searchTimeout;
+// === Search Listeners (Enter & Click) ===
+const searchButton = document.getElementById('searchButton');
+
 if (searchInput) {
-    searchInput.addEventListener('input', () => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
             loadCustomers('first');
-        }, 500); // Wait 500ms before querying server
+        }
+    });
+}
+
+if (searchButton) {
+    searchButton.addEventListener('click', () => {
+        loadCustomers('first');
     });
 }
 
@@ -510,6 +516,9 @@ async function handleExcelUpload(event) {
 
                 if (operationCount >= batchSize) {
                     await batch.commit();
+                    // Small delay to prevent UI freeze and Firestore throttling
+                    await new Promise(resolve => setTimeout(resolve, 300));
+
                     batch = writeBatch(db);
                     operationCount = 0;
                     if (loadingMessage) loadingMessage.innerText = `تم معالجة ${processedCount} عميل...`;
