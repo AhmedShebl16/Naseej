@@ -2,6 +2,19 @@ import { db } from "./firebase-config.js";
 window.inventoryStore = {};
 import { collection, addDoc, getDocs, query, where, Timestamp, deleteDoc, doc, updateDoc, orderBy, limit, startAfter, startAt, endBefore, limitToLast, or, and, getCountFromServer, getAggregateFromServer, sum, average, count } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+// === Non-Blocking Toast Notification ===
+// === Non-Blocking Toast Notification ===
+function showToast(message, type = 'success') {
+    const toastEl = document.getElementById('appToast');
+    const toastBody = document.getElementById('toastMessage');
+    if (toastEl && toastBody) {
+        toastBody.innerHTML = message;
+        toastEl.className = `toast align-items-center text-bg-${type} border-0`;
+        const toast = bootstrap.Toast.getOrCreateInstance(toastEl);
+        toast.show();
+    }
+}
+
 // === DOM Elements ===
 const tableBody = document.getElementById('inventory-table-body');
 const addItemForm = document.getElementById('addItemForm');
@@ -35,8 +48,68 @@ let currentFilters = {
     search: '',
     branchId: '',
     sortBy: 'createdAt',
-    sortOrder: 'desc'
+    sortOrder: 'desc',
+    type: 'raw', // Default to raw on initial load
+    alertMode: false // true = show only low stock
 };
+
+// === Selling Price Visibility Toggle ===
+const itemTypeSelect = document.getElementById('itemType');
+const sellingPriceGroup = document.getElementById('sellingPriceGroup');
+const editItemTypeSelect = document.getElementById('editItemType');
+const editSellingPriceGroup = document.getElementById('editSellingPriceGroup');
+
+function toggleSellingPrice(typeValue, groupEl) {
+    if (groupEl) {
+        groupEl.style.display = typeValue === 'finished' ? 'block' : 'none';
+    }
+}
+
+if (itemTypeSelect) {
+    itemTypeSelect.addEventListener('change', (e) => {
+        toggleSellingPrice(e.target.value, sellingPriceGroup);
+    });
+}
+
+if (editItemTypeSelect) {
+    editItemTypeSelect.addEventListener('change', (e) => {
+        toggleSellingPrice(e.target.value, editSellingPriceGroup);
+    });
+}
+
+// === Sidebar Navigation ===
+function setActiveNav(id) {
+    document.querySelectorAll('.nav-link-custom').forEach(el => el.classList.remove('active'));
+    document.getElementById(id)?.classList.add('active');
+}
+
+// Event Listeners for Sidebar
+document.getElementById('nav-raw')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    setActiveNav('nav-raw');
+    currentFilters.type = 'raw';
+    currentFilters.alertMode = false;
+    document.getElementById('page-title').innerText = 'مخزون الخامات (Raw)';
+    loadInventory('first');
+});
+
+document.getElementById('nav-finished')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    setActiveNav('nav-finished');
+    currentFilters.type = 'finished';
+    currentFilters.alertMode = false;
+    document.getElementById('page-title').innerText = 'مخزون المنتج التام';
+    loadInventory('first');
+});
+
+document.getElementById('nav-alerts')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    setActiveNav('nav-alerts');
+    currentFilters.type = 'all';
+    currentFilters.alertMode = true;
+    document.getElementById('page-title').innerText = 'تنبيهات النواقص';
+    loadInventory('first');
+});
 
 // === Load Stats (Global) ===
 // === Load Stats (Server-Side Control) ===
@@ -44,6 +117,11 @@ async function updateStats() {
     try {
         let qStats = collection(db, "inventory");
         let constraints = [];
+
+        // Filter by type (raw, finished, all)
+        if (currentFilters.type && currentFilters.type !== 'all') {
+            constraints.push(where("type", "==", currentFilters.type));
+        }
 
         if (currentFilters.branchId) {
             constraints.push(where("branchId", "==", currentFilters.branchId));
@@ -59,10 +137,10 @@ async function updateStats() {
         }
 
         const aggQuery = query(qStats, ...constraints);
-        const aggSnap = await getAggregateFromServer(aggQuery, { sQty: sum('quantity') });
-        if (totalItemsEl) totalItemsEl.innerText = (aggSnap.data().sQty || 0).toLocaleString();
 
+        // Get documents for counting and calculations
         const statsQuery = await getDocs(aggQuery);
+        let itemCount = 0;
         let tVal = 0;
         let lStock = 0;
 
@@ -72,10 +150,12 @@ async function updateStats() {
             const cost = parseFloat(data.cost || 0);
             const minQty = parseInt(data.minQuantity || 0);
 
+            itemCount++;
             tVal += (qty * cost);
             if (qty <= minQty) lStock++;
         });
 
+        if (totalItemsEl) totalItemsEl.innerText = itemCount.toLocaleString();
         if (totalValueEl) totalValueEl.innerText = tVal.toLocaleString() + ' ج.م';
         if (lowStockEl) lowStockEl.innerText = lStock.toLocaleString();
     } catch (error) {
@@ -99,6 +179,19 @@ async function loadInventory(direction = 'first') {
             constraints.push(where("branchId", "==", currentFilters.branchId));
         }
 
+        // 1.5 Filter by Type or Alert
+        if (currentFilters.alertMode) {
+            // NOTE: Firestore doesn't accept where(a, <, b) AND orderBy(c).
+            // So for alerts (quantity <= minQuantity), we might need client-side filtering if we sort by createdAt.
+            // However, we can try to query simplest form first.
+            // Since `quantity <= minQuantity` involves comparing two fields, Firestore standard queries DON'T support field-to-field comparison directly in `where`.
+            // We MUST do this client-side or store a flag `isLowStock` on the document.
+            // For now, we'll fetch all (or by branch) and filter client-side for alerts.
+            // To optimize, we can rely on client-side filtering after fetching.
+        } else if (currentFilters.type !== 'all') {
+            constraints.push(where("type", "==", currentFilters.type));
+        }
+
         // 2. Search Logic
         if (currentFilters.search) {
             const searchVal = currentFilters.search.trim();
@@ -109,16 +202,19 @@ async function loadInventory(direction = 'first') {
             } else {
                 constraints.push(where("name", ">=", searchVal));
                 constraints.push(where("name", "<=", searchVal + "\uf8ff"));
+
+                // Only order by name if we are searching by name
                 constraints.push(orderBy("name", "asc"));
             }
         } else {
+            // Apply default sort ONLY if we aren't doing a special filter that conflicts
             constraints.push(orderBy(currentFilters.sortBy, currentFilters.sortOrder));
         }
 
-        if (!isBarcodeSearch) constraints.push(limit(pageSize + 1));
+        if (!isBarcodeSearch && !currentFilters.alertMode) constraints.push(limit(pageSize + 1));
 
         // 4. Pagination
-        if (!isBarcodeSearch) {
+        if (!isBarcodeSearch && !currentFilters.alertMode) {
             if (direction === 'next' && lastVisible) {
                 pageStack.push(firstVisible);
                 constraints.push(startAfter(lastVisible));
@@ -135,15 +231,31 @@ async function loadInventory(direction = 'first') {
         if (querySnapshot.empty) {
             tableBody.innerHTML = '<tr><td colspan="9" class="text-center">لا توجد نتائج</td></tr>';
             if (nextPageBtn) nextPageBtn.disabled = true;
+            if (prevPageBtn) prevPageBtn.disabled = true;
             if (totalResultsEl) totalResultsEl.innerText = "0";
             return;
         }
 
         let results = [];
-        querySnapshot.forEach(doc => results.push({ id: doc.id, ...doc.data(), _snapshot: doc }));
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            // Client-side filtering for Alerts
+            if (currentFilters.alertMode) {
+                const qty = parseInt(data.quantity || 0);
+                const min = parseInt(data.minQuantity || 0);
+                if (qty > min) return; // Skip non-alert items
+            }
+            results.push({ id: doc.id, ...data, _snapshot: doc });
+        });
 
-        // JavaScript Fallback Sort (For Barcode searches ONLY)
-        if (isBarcodeSearch) {
+        if (currentFilters.alertMode && results.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="9" class="text-center">لا توجد نواقص حالياً</td></tr>';
+            if (totalResultsEl) totalResultsEl.innerText = "0";
+            return;
+        }
+
+        // JavaScript Fallback Sort (For Barcode searches OR Alerts)
+        if (isBarcodeSearch || currentFilters.alertMode) {
             const field = currentFilters.sortBy;
             const order = currentFilters.sortOrder;
             results.sort((a, b) => {
@@ -155,8 +267,15 @@ async function loadInventory(direction = 'first') {
         }
 
         // Detect Next Page
-        const hasNextPage = !isBarcodeSearch && results.length > pageSize;
-        const displayResults = hasNextPage ? results.slice(0, pageSize) : results;
+        let hasNextPage = false;
+        let displayResults = results;
+
+        if (!isBarcodeSearch && !currentFilters.alertMode) {
+            hasNextPage = results.length > pageSize;
+            if (hasNextPage) {
+                displayResults = results.slice(0, pageSize);
+            }
+        }
 
         firstVisible = displayResults[0]._snapshot;
         lastVisible = displayResults[displayResults.length - 1]._snapshot;
@@ -184,6 +303,7 @@ async function loadInventory(direction = 'first') {
                     <td class="fw-bold">${data.quantity}</td>
                     <td>${data.minQuantity || 0}</td>
                     <td>${data.cost} ج.م</td>
+                    <td>${data.type === 'finished' && data.sellingPrice ? data.sellingPrice + ' ج.م' : '-'}</td>
                     <td>
                         <div class="btn-group" dir="ltr">
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteItem('${id}')"><i class="bi bi-trash"></i></button>
@@ -204,7 +324,22 @@ async function loadInventory(direction = 'first') {
         }
     } catch (error) {
         console.error("Load Error:", error);
-        tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger p-4">حدث خطأ: ${error.message}</td></tr>`;
+        let errorMsg = `حدث خطأ: ${error.message}`;
+        if (error.message.includes('requires an index')) {
+            const match = error.message.match(/(https:\/\/console\.firebase\.google\.com[^\s]+)/);
+            if (match) {
+                errorMsg = `
+                    <div class="text-start">
+                        <strong>مطلوب إنشاء فهرس (Index)</strong><br>
+                        يتطلب هذا الفرز/التصنيف إنشاء فهرس في قاعدة البيانات.<br>
+                        <a href="${match[1]}" target="_blank" class="btn btn-sm btn-light text-danger fw-bold mt-2">
+                            <i class="bi bi-box-arrow-up-right"></i> اضغط هنا لإنشاء الفهرس تلقائياً
+                        </a>
+                    </div>
+                `;
+            }
+        }
+        tableBody.innerHTML = `<tr><td colspan="9" class="text-center text-danger p-4">${errorMsg}</td></tr>`;
     }
 }
 
@@ -264,6 +399,7 @@ if (addItemForm) {
         const qty = parseInt(document.getElementById('itemQty').value);
         const minQty = parseInt(document.getElementById('itemMinQty').value);
         const cost = parseFloat(document.getElementById('itemCost').value);
+        const sellingPrice = type === 'finished' ? parseFloat(document.getElementById('itemSellingPrice').value) || 0 : null;
 
         try {
             // Check for duplication/merge (within same branch)
@@ -285,12 +421,12 @@ if (addItemForm) {
                         quantity: existingData.quantity + qty,
                         updatedAt: Timestamp.now()
                     });
-                    alert('تم تحديث الكمية بنجاح!');
+                    showToast('تم تحديث الكمية بنجاح!');
                 } else {
-                    await createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName);
+                    await createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName, sellingPrice);
                 }
             } else {
-                await createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName);
+                await createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName, sellingPrice);
             }
 
             bootstrap.Modal.getInstance(document.getElementById('addItemModal')).hide();
@@ -299,24 +435,29 @@ if (addItemForm) {
 
         } catch (e) {
             console.error("Error adding document: ", e);
-            alert('حدث خطأ أثناء الإضافة');
+            showToast('حدث خطأ أثناء الإضافة', 'danger');
         } finally {
             submitBtn.disabled = false;
         }
     });
 }
 
-async function createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName) {
+async function createNewBatch(name, type, unit, qty, minQty, cost, color, branchId, branchName, sellingPrice = null) {
     const barcode = await generateDailyBarcode();
-    await addDoc(collection(db, "inventory"), {
+    const itemData = {
         name, type, unit, color: color || '', quantity: qty, minQuantity: minQty, cost, barcode,
         branchId, branchName,
         createdAt: Timestamp.now(), updatedAt: Timestamp.now()
-    });
-    alert(`تمت الإضافة بنجاح! الباركود: ${barcode}`);
-    if (confirm('هل تريد طباعة الباركود الآن؟')) {
-        printBarcode(barcode);
+    };
+
+    // Only add selling price for finished products
+    if (type === 'finished' && sellingPrice !== null) {
+        itemData.sellingPrice = sellingPrice;
     }
+
+    await addDoc(collection(db, "inventory"), itemData);
+    showToast(`تمت الإضافة بنجاح! الباركود: ${barcode}`);
+    // Print dialog removed to prevent focus issues. User can print from the table.
 }
 
 // === Delete Item ===
@@ -325,9 +466,10 @@ window.deleteItem = async function (id) {
         try {
             await deleteDoc(doc(db, "inventory", id));
             await loadInventory();
+            showToast('تم الحذف بنجاح');
         } catch (e) {
             console.error("Delete Error:", e);
-            alert('خطأ أثناء الحذف');
+            showToast('خطأ أثناء الحذف', 'danger');
         }
     }
 }
@@ -347,6 +489,17 @@ window.openEditModal = function (id) {
     document.getElementById('editItemMinQty').value = data.minQuantity;
     document.getElementById('editItemCost').value = data.cost;
 
+    // Populate selling price for finished products
+    const editSellingPriceGroup = document.getElementById('editSellingPriceGroup');
+    const editSellingPriceInput = document.getElementById('editItemSellingPrice');
+    if (data.type === 'finished') {
+        if (editSellingPriceGroup) editSellingPriceGroup.style.display = 'block';
+        if (editSellingPriceInput) editSellingPriceInput.value = data.sellingPrice || 0;
+    } else {
+        if (editSellingPriceGroup) editSellingPriceGroup.style.display = 'none';
+        if (editSellingPriceInput) editSellingPriceInput.value = '';
+    }
+
     const editModal = new bootstrap.Modal(document.getElementById('editItemModal'));
     editModal.show();
 }
@@ -358,11 +511,12 @@ if (editItemForm) {
         const submitBtn = document.getElementById('editSubmitBtn');
         submitBtn.disabled = true;
 
+        const editType = document.getElementById('editItemType').value;
         const updatedData = {
             branchId: document.getElementById('editItemBranch').value,
             branchName: document.getElementById('editItemBranch').options[document.getElementById('editItemBranch').selectedIndex].text,
             name: document.getElementById('editItemName').value,
-            type: document.getElementById('editItemType').value,
+            type: editType,
             unit: document.getElementById('editItemUnit').value,
             color: document.getElementById('editItemColor').value,
             quantity: parseInt(document.getElementById('editItemQty').value),
@@ -371,14 +525,19 @@ if (editItemForm) {
             updatedAt: Timestamp.now()
         };
 
+        // Only include selling price for finished products
+        if (editType === 'finished') {
+            updatedData.sellingPrice = parseFloat(document.getElementById('editItemSellingPrice').value) || 0;
+        }
+
         try {
             await updateDoc(doc(db, "inventory", id), updatedData);
             bootstrap.Modal.getInstance(document.getElementById('editItemModal')).hide();
             await loadInventory();
-            alert('تم التعديل بنجاح');
+            showToast('تم التعديل بنجاح');
         } catch (e) {
             console.error("Update Error:", e);
-            alert('خطأ أثناء التحديث');
+            showToast('خطأ أثناء التحديث', 'danger');
         } finally {
             submitBtn.disabled = false;
         }
@@ -434,7 +593,7 @@ async function searchByBarcode(barcode) {
     if (!snap.empty) {
         showScanModal(snap.docs[0].data());
     } else {
-        alert("المنتج غير موجود!");
+        showToast("المنتج غير موجود!", 'warning');
     }
 }
 
@@ -477,11 +636,11 @@ if (transferForm) {
 
         if (!currentItemForTransfer) return;
         if (transferQty > currentItemForTransfer.quantity) {
-            alert('الكمية المطلوبة أكبر من الرصيد المتاح!');
+            showToast('الكمية المطلوبة أكبر من الرصيد المتاح!', 'warning');
             return;
         }
         if (toBranchId === currentItemForTransfer.branchId) {
-            alert('لا يمكن التحويل لنفس الفرع!');
+            showToast('لا يمكن التحويل لنفس الفرع!', 'warning');
             return;
         }
 
@@ -531,13 +690,13 @@ if (transferForm) {
                 await addDoc(collection(db, "inventory"), newItemData);
             }
 
-            alert('تم التحويل بنجاح!');
+            showToast('تم التحويل بنجاح!');
             bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide();
             await loadInventory();
 
         } catch (error) {
             console.error("Transfer Full Error:", error);
-            alert('حدث خطأ أثناء عملية التحويل: ' + error.message);
+            showToast('حدث خطأ أثناء عملية التحويل: ' + error.message, 'danger');
         } finally {
             submitBtn.disabled = false;
         }
@@ -605,6 +764,34 @@ async function initBranches() {
         console.error("Branches Load Error:", error);
     }
 }
+
+// === Stability Fix: Force Enable Inputs on Modal Show ===
+const modals = ['addItemModal', 'editItemModal', 'transferModal'];
+modals.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('shown.bs.modal', () => {
+            // Delay to ensure Bootstrap animation completes
+            setTimeout(() => {
+                el.querySelectorAll('input, select, textarea, button').forEach(input => {
+                    input.disabled = false;
+                });
+                // Auto-focus the first input if available
+                const firstInput = el.querySelector('input:not([type="hidden"]), select');
+                if (firstInput) {
+                    firstInput.focus();
+                    firstInput.select(); // Highlight text if any
+                }
+            }, 150);
+        });
+
+        // Force focus back to window on hide to prevent trapped state
+        el.addEventListener('hidden.bs.modal', () => {
+            if (window) window.focus();
+            document.body.focus();
+        });
+    }
+});
 
 // Initial Load
 initBranches();

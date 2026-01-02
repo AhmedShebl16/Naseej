@@ -7,6 +7,16 @@ const loginBtn = document.getElementById('loginBtn');
 const errorBox = document.getElementById('loginError');
 
 if (loginForm) {
+    // Reset form state on load
+    window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('username').disabled = false;
+        document.getElementById('password').disabled = false;
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = 'تسجيل الدخول';
+        errorBox.style.display = 'none';
+        loginForm.reset();
+    });
+
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault(); // Prevent page reload
 

@@ -21,6 +21,9 @@
         </h3>
         <ul class="nav flex-column">
             <li class="nav-item">
+                <a class="nav-link-custom" href="index.html"><i class="bi bi-speedometer2 ms-2"></i> لوحة القيادة</a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link-custom active" href="#" id="nav-raw"><i class="bi bi-box-seam ms-2"></i> الخامات
                     (Raw)</a>
             </li>
@@ -34,6 +37,9 @@
             <li class="nav-item">
                 <a class="nav-link-custom" href="branches.html" id="nav-branches"><i class="bi bi-geo-alt ms-2"></i>
                     إدارة الفروع</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="users.html"><i class="bi bi-people ms-2"></i> إدارة المستخدمين</a>
             </li>
             <li class="nav-item mt-5">
                 <a class="nav-link-custom text-danger" href="login.html" onclick="localStorage.clear()"><i
@@ -148,6 +154,7 @@
                         <th>الكمية الحالية</th>
                         <th>حد الطلب</th>
                         <th>السعر (Cost)</th>
+                        <th>سعر البيع</th>
                         <th>تحكم</th>
                     </tr>
                 </thead>
@@ -176,7 +183,7 @@
     </div>
 
     <!-- Add Item Modal -->
-    <div class="modal fade" id="addItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="addItemModal" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -233,6 +240,10 @@
                             <label class="form-label">سعر التكلفة</label>
                             <input type="number" class="form-control" id="itemCost" required>
                         </div>
+                        <div class="mb-3" id="sellingPriceGroup" style="display: none;">
+                            <label class="form-label">سعر البيع</label>
+                            <input type="number" class="form-control" id="itemSellingPrice" step="0.01">
+                        </div>
                         <button type="submit" class="btn btn-primary w-100">حفظ</button>
                     </form>
                 </div>
@@ -241,7 +252,7 @@
     </div>
 
     <!-- Edit Item Modal -->
-    <div class="modal fade" id="editItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="editItemModal" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
@@ -298,6 +309,10 @@
                             <label class="form-label">سعر التكلفة</label>
                             <input type="number" class="form-control" id="editItemCost" required>
                         </div>
+                        <div class="mb-3" id="editSellingPriceGroup" style="display: none;">
+                            <label class="form-label">سعر البيع</label>
+                            <input type="number" class="form-control" id="editItemSellingPrice" step="0.01">
+                        </div>
                         <button type="submit" id="editSubmitBtn" class="btn btn-primary w-100">حفظ التعديلات</button>
                     </form>
                 </div>
@@ -306,7 +321,7 @@
     </div>
 
     <!-- Scanned Item Details Modal -->
-    <div class="modal fade" id="scanModal" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="scanModal" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content text-center">
                 <div class="modal-header bg-light justify-content-between">
@@ -359,7 +374,7 @@
     </div>
 
     <!-- Transfer Item Modal -->
-    <div class="modal fade" id="transferModal" tabindex="-1">
+    <div class="modal fade" id="transferModal">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 rounded-4 shadow">
                 <div class="modal-header border-0 pb-0">
@@ -397,6 +412,20 @@
                             id="transferSubmitBtn">إتمام التحويل</button>
                     </form>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container for non-blocking notifications -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="appToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive"
+            aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage">
+                    تمت العملية بنجاح!
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                    aria-label="Close"></button>
             </div>
         </div>
     </div>
