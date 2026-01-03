@@ -433,6 +433,7 @@ if (checkoutBtn) {
             // 3. Create Sale Record
             const saleRef = doc(collection(db, "sales"));
             const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const totalCost = cart.reduce((acc, item) => acc + ((Number(item.cost) || 0) * item.qty), 0);
 
             batch.set(saleRef, {
                 customerName: saleCustomer.name,
@@ -444,6 +445,18 @@ if (checkoutBtn) {
                 branchId: currentUser.branchId,
                 branchName: currentUser.branchName
             });
+
+            // 3.5 Update Daily Stats (Aggregation)
+            const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            const dailyStatsRef = doc(db, "daily_stats", todayStr);
+
+            batch.set(dailyStatsRef, {
+                date: todayStr,
+                totalSales: increment(totalAmount),
+                totalCost: increment(totalCost),
+                orderCount: increment(1),
+                updatedAt: Timestamp.now()
+            }, { merge: true });
 
             // 4. Update Inventory (Decrement Stock)
             cart.forEach(item => {
