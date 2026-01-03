@@ -125,7 +125,7 @@ async function loadSales(direction = 'first') {
                 <td class="fw-bold text-success">${total} ج.م</td>
                 <td>
                     <div class="fw-bold small">${data.user || '-'}</div>
-                    <small class="text-muted">${data.branchName || '-'}</small>
+                    <small class="text-muted">${data.branchName || 'غير محدد'}</small>
                 </td>
                 <td><button class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></button></td>
             </tr>

@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الخدمات - Cairo Class</title>
+    <link rel="icon" type="image/png" href="assets/logo-favicon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <h3 class="text-center fw-bold mb-4">Cairo Class <small
+                style="font-size: 0.5em; display: block;">الخدمات</small>
+        </h3>
+        <ul class="nav flex-column">
+            <li class="nav-item">
+                <a class="nav-link-custom" href="index.html"><i class="bi bi-speedometer2 ms-2"></i> لوحة القيادة</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="inventory.html"><i class="bi bi-box-seam ms-2"></i> إدارة المخزون</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="pos.html"><i class="bi bi-cart4 ms-2"></i> نقطة البيع</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="sales.html"><i class="bi bi-receipt ms-2"></i> المبيعات</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="reports.html"><i class="bi bi-bar-chart-line ms-2"></i> التقارير
+                    المالية</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom active" href="services.html"><i class="bi bi-scissors ms-2"></i> الخدمات</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="branches.html"><i class="bi bi-geo-alt ms-2"></i> إدارة الفروع</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="customers.html"><i class="bi bi-people-fill ms-2"></i> العملاء</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link-custom" href="users.html"><i class="bi bi-people ms-2"></i> إدارة المستخدمين</a>
+            </li>
+            <li class="nav-item mt-5">
+                <a class="nav-link-custom text-danger" href="login.html" onclick="localStorage.clear()"><i
+                        class="bi bi-box-arrow-right ms-2"></i> تسجيل خروج</a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">إدارة الخدمات</h2>
+                <p class="text-muted">إدارة أسعار التفصيل والتصليح والدراي كلين</p>
+            </div>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addServiceModal">
+                <i class="bi bi-plus-lg"></i> إضافة خدمة
+            </button>
+        </header>
+
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4">
+            <li class="nav-item">
+                <button class="nav-link active fw-bold" onclick="switchTab('tailoring', this)">
+                    <i class="bi bi-scissors"></i> تفصيل
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link fw-bold" onclick="switchTab('repair', this)">
+                    <i class="bi bi-tools"></i> تصليح
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link fw-bold" onclick="switchTab('dry_clean', this)">
+                    <i class="bi bi-droplet"></i> دراي كلين
+                </button>
+            </li>
+        </ul>
+
+        <!-- Content -->
+        <div class="tab-content" id="servicesTabContent">
+
+            <!-- Shared Table Container (We will re-render content based on selection) -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="py-3 ps-4">اسم الخدمة</th>
+                                <th class="py-3">السعر</th>
+                                <th class="py-3 text-end pe-4">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody id="servicesTableBody">
+                            <tr>
+                                <td colspan="3" class="text-center py-5">
+                                    <span class="spinner-border text-primary"></span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Add Service Modal -->
+    <div class="modal fade" id="addServiceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="addServiceForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">إضافة خدمة جديدة</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">نوع الخدمة</label>
+                            <select class="form-select" id="serviceType" required>
+                                <option value="tailoring">تفصيل</option>
+                                <option value="repair">تصليح</option>
+                                <option value="dry_clean">دراي كلين</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">اسم الخدمة</label>
+                            <input type="text" class="form-control" id="serviceName" placeholder="مثال: تقصير بنطلون"
+                                required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">السعر (ج.م)</label>
+                            <input type="number" class="form-control" id="servicePrice" min="0" step="0.5" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">حفظ</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Service Modal -->
+    <div class="modal fade" id="editServiceModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="editServiceForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">تعديل الخدمة</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="editServiceId">
+                        <div class="mb-3">
+                            <label class="form-label">نوع الخدمة</label>
+                            <select class="form-select" id="editServiceType" required disabled>
+                                <option value="tailoring">تفصيل</option>
+                                <option value="repair">تصليح</option>
+                                <option value="dry_clean">دراي كلين</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">اسم الخدمة</label>
+                            <input type="text" class="form-control" id="editServiceName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">السعر (ج.م)</label>
+                            <input type="number" class="form-control" id="editServicePrice" min="0" step="0.5" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/services.js"></script>
+</body>
+
+</html>
