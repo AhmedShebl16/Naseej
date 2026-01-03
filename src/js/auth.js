@@ -84,6 +84,8 @@ if (loginForm) {
                 // 2. Redirect based on Role
                 if (userData.role === 'cashier' || userData.role === 'sales') {
                     window.location.href = 'pos.html';
+                } else if (userData.role === 'tailor') {
+                    window.location.href = 'pos_services.html';
                 } else if (userData.role === 'inventory') {
                     window.location.href = 'inventory.html';
                 } else {

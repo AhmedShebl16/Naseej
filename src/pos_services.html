@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نقطة بيع الخدمات - Cairo Class</title>
+    <link rel="icon" type="image/png" href="assets/logo-favicon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Security Check
+        const role = localStorage.getItem('userRole');
+        if (!role || (role !== 'tailor' && role !== 'admin' && role !== 'superadmin')) {
+            window.location.href = 'login.html';
+        }
+    </script>
+</head>
+
+<body>
+
+    <div class="pos-layout no-sidebar">
+
+        <!-- RIGHT: Services Grid -->
+        <div class="product-grid-area p-3">
+            <header class="d-flex justify-content-between align-items-center mb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <h3 class="fw-bold m-0 text-primary">خدمات الخياطة</h3>
+                    <select id="branchSelect" class="form-select form-select-sm border-secondary shadow-sm"
+                        style="width: 200px; font-weight:bold;">
+                        <option value="" disabled selected>اختر الفرع...</option>
+                    </select>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                    <span class="text-dark small fw-bold" id="cashierNameDisplay"></span>
+                    <button class="btn btn-sm btn-outline-danger"
+                        onclick="localStorage.clear(); window.location.reload()">
+                        <i class="bi bi-box-arrow-right"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Tabs -->
+            <ul class="nav nav-pills mb-3" id="servicesTabs">
+                <li class="nav-item">
+                    <button class="nav-link active fw-bold px-4" onclick="switchTab('tailoring', this)">
+                        <i class="bi bi-scissors"></i> تفصيل
+                    </button>
+                </li>
+                <li class="nav-item ms-2">
+                    <button class="nav-link fw-bold px-4" onclick="switchTab('repair', this)">
+                        <i class="bi bi-tools"></i> تصليح
+                    </button>
+                </li>
+                <li class="nav-item ms-2">
+                    <button class="nav-link fw-bold px-4" onclick="switchTab('dry_clean', this)">
+                        <i class="bi bi-droplet"></i> دراي كلين
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Search -->
+            <div class="input-group mb-3">
+                <span class="input-group-text bg-white border-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" class="form-control border-0 py-2" id="serviceSearchInput"
+                    placeholder="بحث عن خدمة...">
+            </div>
+
+            <!-- Grid -->
+            <div class="row g-3" id="servicesGrid">
+                <!-- Services Cards Loaded Here -->
+                <div class="col-12 text-center py-5">
+                    <div class="spinner-border text-light"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LEFT: Cart Sidebar -->
+        <div class="cart-sidebar d-flex flex-column">
+
+            <!-- Customer Section -->
+            <div class="p-3 border-bottom border-secondary">
+                <label class="form-label text-warning small fw-bold mb-1">بيانات العميل (رقم الهاتف)</label>
+                <div class="input-group">
+                    <input type="tel" id="customerPhone"
+                        class="form-control form-control-sm bg-dark text-white border-secondary"
+                        placeholder="01xxxxxxxxx">
+                    <button class="btn btn-warning btn-sm" id="searchCustomerBtn"><i class="bi bi-search"></i></button>
+                </div>
+                <!-- Customer info loaded here -->
+                <div id="customerInfo" class="mt-2 small text-info" style="display:none;">
+                    <span id="custName"></span> <span class="badge bg-success ms-1">عميل موجود</span>
+                </div>
+                <div id="newCustomerInput" class="mt-2" style="display:none;">
+                    <input type="text" id="newCustomerName"
+                        class="form-control form-control-sm bg-dark text-white border-secondary"
+                        placeholder="اسم العميل الجديد">
+                </div>
+            </div>
+
+            <!-- Cart Items -->
+            <div class="flex-grow-1 overflow-auto p-2" id="cartItemsContainer">
+                <div class="text-center text-muted mt-5 py-5">
+                    <i class="bi bi-cart-x display-4 opacity-50"></i>
+                    <p class="mt-2 small">السلة فارغة</p>
+                </div>
+            </div>
+
+            <!-- Checkout Footer -->
+            <div class="p-3 bg-dark border-top border-secondary">
+                <div class="d-flex justify-content-between mb-2 text-white">
+                    <span>الإجمالي:</span>
+                    <span class="fw-bold fs-4" id="cartTotal">0.00</span>
+                </div>
+                <button class="btn btn-success w-100 fw-bold py-3" id="checkoutBtn">
+                    <i class="bi bi-check-circle me-2"></i> إتمام الطلب (Checkout)
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Service Material Modal (Multi-Material) -->
+    <div class="modal fade" id="materialModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark" id="materialModalTitle">إضافة خامات</h5>
+                        <p class="text-muted small mb-0">حدد الخامات المستخدمة من القائمة أدناه</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-4">
+                    <input type="hidden" id="selectedServiceId">
+
+                    <!-- Add Section -->
+                    <div class="bg-light p-3 rounded-3 border mb-4">
+                        <label class="form-label small fw-bold text-dark">اختر خامة لإضافتها</label>
+                        <div class="d-flex gap-2 mb-2">
+                            <select id="materialSelect" class="form-select form-select-sm border-secondary"
+                                style="flex:2">
+                                <option value="" selected>اختر خامة...</option>
+                            </select>
+                            <input type="number" id="materialQty" class="form-control form-control-sm border-secondary"
+                                value="1" min="0.1" step="0.1" style="width: 80px" placeholder="الكمية">
+                            <button type="button" class="btn btn-sm btn-primary" id="addMaterialToListBtn">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                        <small class="text-primary fw-bold d-block" id="stockInfo"></small>
+                    </div>
+
+                    <!-- List Section -->
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-muted">الخامات المضافة للخدمة:</label>
+                        <ul class="list-group list-group-flush border rounded-3 overflow-hidden"
+                            id="selectedMaterialsList">
+                            <li class="list-group-item text-muted small text-center py-3 bg-white">
+                                <i class="bi bi-basket2 mb-1 d-block" style="font-size: 1.5rem; opacity:0.5"></i>
+                                لم يتم إضافة خامات بعد
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="button" class="btn btn-success rounded-pill px-4 flex-grow-1" id="confirmAddToCarBtn">
+                        <i class="bi bi-check2"></i> تأكيد وإضافة للسلة
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 start-0 p-3">
+        <div id="liveToast" class="toast align-items-center text-white bg-danger border-0" role="alert"
+            aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage">
+                    <!-- Msg -->
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                    aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/pos_services.js"></script>
+</body>
+
+</html>
