@@ -12,6 +12,7 @@ const searchInput = document.getElementById('searchCustomerInput');
 const prevPageBtn = document.getElementById('prevPageBtn');
 const nextPageBtn = document.getElementById('nextPageBtn');
 const pageInfo = document.getElementById('page-info');
+const sortSelect = document.getElementById('sortSelect');
 
 // === Global State ===
 let customersStore = {};
@@ -20,6 +21,7 @@ let pageStack = []; // Stores the first document of each page for "Previous" nav
 let currentPage = 1;
 const ITEMS_PER_PAGE = 15;
 let isSearching = false;
+let currentSortField = 'createdAt'; // Default sort
 
 // === Phone Normalization ===
 function normalizePhone(phone) {
@@ -108,11 +110,11 @@ async function loadCustomers(direction = 'first') {
             }
         } else {
             isSearching = false;
-            // Normal Pagination (Order by CreatedAt Desc)
+            // Normal Pagination with Server-Side Sorting
             if (direction === 'next' && lastVisibleDoc) {
-                q = query(customersRef, orderBy("createdAt", "desc"), startAfter(lastVisibleDoc), limit(ITEMS_PER_PAGE));
+                q = query(customersRef, orderBy(currentSortField, "desc"), startAfter(lastVisibleDoc), limit(ITEMS_PER_PAGE));
             } else {
-                q = query(customersRef, orderBy("createdAt", "desc"), limit(ITEMS_PER_PAGE));
+                q = query(customersRef, orderBy(currentSortField, "desc"), limit(ITEMS_PER_PAGE));
             }
         }
 
@@ -157,7 +159,7 @@ async function loadCustomers(direction = 'first') {
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty && currentPage === 1) {
-            customersTableBody.innerHTML = '<tr><td colspan="4" class="text-center">لا يوجد عملاء حالياً</td></tr>';
+            customersTableBody.innerHTML = '<tr><td colspan="6" class="text-center">لا يوجد عملاء حالياً</td></tr>';
             if (totalCustomersEl) totalCustomersEl.innerText = "0";
             updatePaginationControls(true); // Disable "Next"
             return;
@@ -203,16 +205,21 @@ async function loadCustomers(direction = 'first') {
             customersStore[id] = data;
 
             const date = data.createdAt ? data.createdAt.toDate().toLocaleDateString('ar-EG') : '-';
+            const orderCount = data.orderCount || 0;
+            const totalSpent = data.totalSpent || 0;
 
             html += `
                 <tr>
                     <td>${data.name}</td>
                     <td dir="ltr" class="text-start">${data.phone}</td>
+                    <td><span class="badge bg-primary">${orderCount}</span></td>
+                    <td class="fw-bold text-success">${totalSpent.toLocaleString()} ج.م</td>
                     <td><small>${date}</small></td>
                     <td>
                         <div class="btn-group" dir="ltr">
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCustomer('${id}')"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewCustomerOrders('${id}')" title="عرض الطلبات"><i class="bi bi-receipt"></i></button>
                             <button class="btn btn-sm btn-outline-info" onclick="openEditCustomerModal('${id}')"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteCustomer('${id}')"><i class="bi bi-trash"></i></button>
                         </div>
                     </td>
                 </tr>
@@ -314,7 +321,10 @@ if (addCustomerForm) {
                 name,
                 phone,
                 createdAt: Timestamp.now(),
-                updatedAt: Timestamp.now()
+                updatedAt: Timestamp.now(),
+                // Analytics fields - initialized to 0 for new customers
+                orderCount: 0,
+                totalSpent: 0
             });
 
             // Increment Counter
@@ -527,14 +537,10 @@ async function handleExcelUpload(event) {
                     name: cust.name,
                     phone: cust.phone,
                     updatedAt: Timestamp.now(),
-                    // We might overwrite createdAt if we send it. 
-                    // To avoid overwriting createdAt, we can exclude it? 
-                    // But if it's NEW, we need createdAt.
-                    // Dilemma: We don't know if it's new.
-                    // Solution: Send createdAt. If it overwrites, it means "re-added". 
-                    // Or, we accept that Bulk Upload via this method resets createdAt for duplicates.
-                    // Given the constraint "Zero Reads", we accept this.
-                    createdAt: Timestamp.now()
+                    createdAt: Timestamp.now(),
+                    // Analytics fields - initialized to 0 for new customers
+                    orderCount: 0,
+                    totalSpent: 0
                 }, { merge: true });
 
                 operationCount++;
@@ -579,6 +585,105 @@ async function handleExcelUpload(event) {
 
     reader.readAsArrayBuffer(file);
 }
+
+// === Sort Dropdown Listener ===
+if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+        currentSortField = e.target.value;
+        currentPage = 1;
+        pageStack = [];
+        lastVisibleDoc = null;
+        loadCustomers('first');
+    });
+}
+
+// === View Customer Orders (On-Demand Query) ===
+window.viewCustomerOrders = async function (customerId) {
+    const customer = customersStore[customerId];
+    if (!customer) return;
+
+    // Get or create modal
+    let modal = document.getElementById('customerOrdersModal');
+    if (!modal) {
+        // Create modal dynamically if not exists
+        const modalHtml = `
+        <div class="modal fade" id="customerOrdersModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold"><i class="bi bi-receipt"></i> طلبات العميل</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-flex justify-content-between mb-3 p-2 bg-light rounded">
+                            <div><strong>العميل:</strong> <span id="ordersCustomerName">-</span></div>
+                            <div><strong>الهاتف:</strong> <span id="ordersCustomerPhone" dir="ltr">-</span></div>
+                        </div>
+                        <div id="customerOrdersList" class="text-center py-3">
+                            <span class="spinner-border text-primary"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        modal = document.getElementById('customerOrdersModal');
+    }
+
+    const ordersListEl = document.getElementById('customerOrdersList');
+    const customerNameEl = document.getElementById('ordersCustomerName');
+    const customerPhoneEl = document.getElementById('ordersCustomerPhone');
+
+    customerNameEl.innerText = customer.name;
+    customerPhoneEl.innerText = customer.phone;
+    ordersListEl.innerHTML = '<div class="text-center py-3"><span class="spinner-border text-primary"></span></div>';
+
+    const bsModal = new bootstrap.Modal(modal);
+    bsModal.show();
+
+    // Fetch orders on-demand
+    try {
+        const salesRef = collection(db, "sales");
+        const q = query(salesRef, where("customerPhone", "==", customer.phone), orderBy("createdAt", "desc"), limit(50));
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            ordersListEl.innerHTML = '<div class="text-muted text-center py-4"><i class="bi bi-inbox display-4 opacity-25"></i><p class="mt-2">لا توجد طلبات لهذا العميل</p></div>';
+            return;
+        }
+
+        let html = `<table class="table table-sm table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>التاريخ</th>
+                    <th>الأصناف</th>
+                    <th>الإجمالي</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            const date = data.createdAt ? data.createdAt.toDate().toLocaleString('ar-EG') : '-';
+            const itemCount = data.items ? data.items.length : 0;
+            const total = Number(data.totalAmount || 0).toLocaleString();
+
+            html += `
+            <tr>
+                <td><small>${date}</small></td>
+                <td><span class="badge bg-secondary">${itemCount} أصناف</span></td>
+                <td class="fw-bold text-success">${total} ج.م</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        ordersListEl.innerHTML = html;
+
+    } catch (error) {
+        console.error("Load Orders Error:", error);
+        ordersListEl.innerHTML = `<div class="text-danger">خطأ في تحميل الطلبات: ${error.message}</div>`;
+    }
+};
 
 // === Initialize ===
 loadCustomers();

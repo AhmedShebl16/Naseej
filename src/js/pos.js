@@ -405,10 +405,17 @@ if (checkoutBtn) {
             if (saleCustomer.phone !== "Walk-in") {
                 const custRef = doc(db, "customers", saleCustomer.phone);
 
+                // Calculate total for increment
+                const saleTotalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+
                 const customerData = {
                     name: saleCustomer.name,
                     phone: saleCustomer.phone,
-                    updatedAt: Timestamp.now()
+                    updatedAt: Timestamp.now(),
+                    // Analytics: Increment order count and total spent
+                    orderCount: increment(1),
+                    totalSpent: increment(saleTotalAmount),
+                    lastOrderDate: Timestamp.now()
                 };
 
                 if (saleCustomer.isNew) {
