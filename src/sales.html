@@ -58,28 +58,44 @@
 
     <!-- Main Content -->
     <div class="main-content">
-        <header class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="fw-bold text-dark">سجل المبيعات</h2>
-            <!-- <button class="btn btn-outline-primary"><i class="bi bi-printer"></i> طباعة تقرير</button> -->
-        </header>
+        <!-- Header & Toolbar -->
+        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+            <h4 class="fw-bold text-primary m-0"><i class="bi bi-receipt me-2"></i> سجل المبيعات</h4>
 
-        <!-- Stats / Filters -->
-        <div class="card p-3 mb-4">
-            <div class="row g-3">
-                <div class="col-md-5">
-                    <div class="input-group">
-                        <span class="input-group-text bg-white border-end-0">
-                            <i class="bi bi-telephone text-muted"></i>
-                        </span>
-                        <input type="text" id="salesSearchInput" class="form-control border-start-0 border-end-0"
-                            placeholder="بحث برقم الهاتف (اضغط Enter)" dir="ltr" style="text-align: right;">
-                        <button class="btn btn-outline-danger" type="button" id="clearSearchBtn" title="مسح البحث">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                    <small class="text-muted">أدخل رقم الهاتف واضغط Enter للبحث</small>
+            <div class="sales-toolbar-container">
+                <!-- Branch Filter -->
+                <div class="sales-filter-group">
+                    <select id="branchFilter" class="form-select sales-filter-select shadow-none">
+                        <option value="all">كل الفروع</option>
+                        <option disabled>جاري التحميل...</option>
+                    </select>
                 </div>
-                <!-- Add Date Range later if needed -->
+
+                <div class="sales-divider"></div>
+
+                <!-- Type Filter -->
+                <div class="sales-filter-group">
+                    <select id="typeFilter" class="form-select sales-filter-select shadow-none">
+                        <option value="all" selected>كل الأنواع</option>
+                        <option value="pos">مبيعات (Retail)</option>
+                        <option value="service">كل الخدمات</option>
+                        <option value="tailoring">خدمة: تفصيل</option>
+                        <option value="repair">خدمة: تصليح</option>
+                        <option value="dry_clean">خدمة: دراي كلين</option>
+                    </select>
+                </div>
+
+                <div class="sales-divider"></div>
+
+                <!-- Search -->
+                <div class="sales-search-group" dir="rtl">
+                    <button class="sales-search-icon"><i class="bi bi-search"></i></button>
+                    <input type="text" class="sales-search-input" id="searchSalesInput"
+                        placeholder="بحث... (هاتف، اسم، طلب)">
+                    <button class="sales-search-clear" id="clearSearchBtn" title="مسح"><i
+                            class="bi bi-x-lg"></i></button>
+                    <button class="sales-search-btn" id="searchSalesBtn">بحث</button>
+                </div>
             </div>
         </div>
 
@@ -90,9 +106,13 @@
                     <thead class="bg-light sticky-top">
                         <tr>
                             <th class="py-3 ps-4">التاريخ</th>
+                            <th class="py-3">رقم الطلب</th>
                             <th class="py-3">العميل</th>
-                            <th class="py-3">عدد الأصناف</th>
+                            <th class="py-3">النوع (الأصناف)</th>
                             <th class="py-3">الإجمالي</th>
+                            <th class="py-3">المدفوع</th>
+                            <th class="py-3">المتبقي</th>
+                            <th class="py-3">الحالة</th>
                             <th class="py-3">بواسطة</th>
                             <th class="py-3">تفاصيل</th>
                         </tr>
@@ -126,6 +146,34 @@
 
     </div>
 
+    <!-- Update Status Modal -->
+    <div class="modal fade" id="updateStatusModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold">تحديث حالة الطلب</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="updateSaleId">
+                    <div class="mb-3">
+                        <label class="form-label">الحالة الجديدة</label>
+                        <select class="form-select" id="newStatusSelect">
+                            <option value="received">تم الاستلام</option>
+                            <option value="in_progress">بدأ العمل عليه</option>
+                            <option value="completed">تم التنفيذ</option>
+                            <option value="delivered_and_paid">تم التسليم والتحصيل</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="button" class="btn btn-primary" id="saveStatusBtn">حفظ التغييرات</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Sale Details Modal -->
     <div class="modal fade" id="saleDetailsModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -137,6 +185,10 @@
                 <div class="modal-body">
                     <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
                         <div>
+                            <small class="text-muted d-block">رقم الطلب</small>
+                            <span class="fw-bold text-primary" id="detailOrderId">-</span>
+                        </div>
+                        <div>
                             <small class="text-muted d-block">العميل</small>
                             <span class="fw-bold" id="detailCustomerName">-</span>
                         </div>
@@ -145,8 +197,22 @@
                             <span class="fw-bold" id="detailCustomerPhone">-</span>
                         </div>
                         <div>
-                            <small class="text-muted d-block">التاريخ</small>
+                            <small class="text-muted d-block">تاريخ الطلب</small>
                             <span class="fw-bold" id="detailDate">-</span>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                        <div>
+                            <small class="text-muted d-block">تاريخ التسليم</small>
+                            <span class="fw-bold text-danger" id="detailDeliveryDate">-</span>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">حالة الطلب</small>
+                            <span id="detailStatusBadge">-</span>
+                        </div>
+                        <div>
+                            <small class="text-muted d-block">مسجل بواسطة</small>
+                            <span class="fw-bold" id="detailUser">-</span>
                         </div>
                     </div>
 
@@ -164,6 +230,14 @@
                             <tr>
                                 <td colspan="3" class="text-end fw-bold">الإجمالي الكلي:</td>
                                 <td class="fw-bold text-primary" id="detailTotalAmount">0</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">المدفوع:</td>
+                                <td class="fw-bold text-success" id="detailPaidAmount">0</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">المتبقي:</td>
+                                <td class="fw-bold text-danger" id="detailRemainingAmount">0</td>
                             </tr>
                         </tfoot>
                     </table>

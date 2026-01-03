@@ -1,5 +1,5 @@
 import { db } from "./firebase-config.js";
-import { collection, getDocs, query, where, doc, getDoc, setDoc, addDoc, updateDoc, increment, writeBatch, Timestamp, limit } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, getDocs, query, where, doc, getDoc, setDoc, addDoc, updateDoc, increment, writeBatch, Timestamp, limit, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // === DOM Elements ===
 const productGrid = document.getElementById('products-grid');
@@ -399,75 +399,87 @@ if (checkoutBtn) {
         checkoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري المعالجة...';
 
         try {
-            const batch = writeBatch(db);
+            await runTransaction(db, async (transaction) => {
+                // 1. Generate Custom Order ID
+                const now = new Date();
+                const dd = String(now.getDate()).padStart(2, '0');
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const yyyy = now.getFullYear();
+                const dateStr = `${dd}${mm}${yyyy}`; // 03012026
 
-            // 2. Handle Customer (Upsert) - Zero-Read Strategy
-            if (saleCustomer.phone !== "Walk-in") {
-                const custRef = doc(db, "customers", saleCustomer.phone);
+                const counterRef = doc(db, "counters", "sales_" + dateStr);
+                const counterSnap = await transaction.get(counterRef);
 
-                // Calculate total for increment
-                const saleTotalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+                let newCount = 1;
+                if (counterSnap.exists()) {
+                    newCount = counterSnap.data().count + 1;
+                }
+                transaction.set(counterRef, { count: newCount }, { merge: true });
 
-                const customerData = {
-                    name: saleCustomer.name,
-                    phone: saleCustomer.phone,
-                    updatedAt: Timestamp.now(),
-                    // Analytics: Increment order count and total spent
+                const orderId = `${dateStr}${String(newCount).padStart(3, '0')}`; // 03012026001
+
+                // 2. Calculations
+                const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+                const totalCost = cart.reduce((acc, item) => acc + ((Number(item.cost) || 0) * item.qty), 0);
+
+                // 3. Handle Customer (Upsert)
+                if (saleCustomer.phone !== "Walk-in") {
+                    const custRef = doc(db, "customers", saleCustomer.phone);
+                    const customerData = {
+                        name: saleCustomer.name,
+                        phone: saleCustomer.phone,
+                        updatedAt: Timestamp.now(),
+                        orderCount: increment(1),
+                        totalSpent: increment(totalAmount),
+                        lastOrderDate: Timestamp.now()
+                    };
+
+                    if (saleCustomer.isNew) {
+                        customerData.createdAt = Timestamp.now();
+                        const statsRef = doc(db, "stats", "general");
+                        transaction.update(statsRef, { customersCount: increment(1) });
+                    }
+
+                    transaction.set(custRef, customerData, { merge: true });
+                }
+
+                // 4. Create Sale Record with Custom ID
+                const saleRef = doc(db, "sales", orderId);
+                transaction.set(saleRef, {
+                    orderId: orderId,
+                    customerName: saleCustomer.name,
+                    customerPhone: saleCustomer.phone,
+                    items: cart,
+                    totalAmount: totalAmount,
+                    amountPaid: totalAmount, // POS is always fully paid
+                    remainingAmount: 0,
+                    type: 'pos',
+                    status: 'completed', // POS is typically completed immediately
+                    createdAt: Timestamp.now(),
+                    user: currentUser.username,
+                    branchId: currentUser.branchId,
+                    branchName: currentUser.branchName
+                });
+
+                // 5. Update Daily Stats
+                const todayIso = now.toISOString().split('T')[0];
+                const dailyStatsRef = doc(db, "daily_stats", todayIso);
+                transaction.set(dailyStatsRef, {
+                    date: todayIso,
+                    totalSales: increment(totalAmount),
+                    totalCost: increment(totalCost),
                     orderCount: increment(1),
-                    totalSpent: increment(saleTotalAmount),
-                    lastOrderDate: Timestamp.now()
-                };
+                    updatedAt: Timestamp.now()
+                }, { merge: true });
 
-                if (saleCustomer.isNew) {
-                    customerData.createdAt = Timestamp.now();
-                }
-
-                batch.set(custRef, customerData, { merge: true });
-
-                if (currentCustomer && currentCustomer.isNew) {
-                    const statsRef = doc(db, "stats", "general");
-                    batch.update(statsRef, { customersCount: increment(1) });
-                }
-            }
-
-            // 3. Create Sale Record
-            const saleRef = doc(collection(db, "sales"));
-            const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
-            const totalCost = cart.reduce((acc, item) => acc + ((Number(item.cost) || 0) * item.qty), 0);
-
-            batch.set(saleRef, {
-                customerName: saleCustomer.name,
-                customerPhone: saleCustomer.phone,
-                items: cart, // {id, name, qty, price, cost}
-                totalAmount: totalAmount,
-                createdAt: Timestamp.now(),
-                user: currentUser.username,
-                branchId: currentUser.branchId,
-                branchName: currentUser.branchName
-            });
-
-            // 3.5 Update Daily Stats (Aggregation)
-            const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-            const dailyStatsRef = doc(db, "daily_stats", todayStr);
-
-            batch.set(dailyStatsRef, {
-                date: todayStr,
-                totalSales: increment(totalAmount),
-                totalCost: increment(totalCost),
-                orderCount: increment(1),
-                updatedAt: Timestamp.now()
-            }, { merge: true });
-
-            // 4. Update Inventory (Decrement Stock)
-            cart.forEach(item => {
-                const itemRef = doc(db, "inventory", item.id);
-                batch.update(itemRef, {
-                    quantity: increment(-item.qty)
+                // 6. Update Inventory (Decrement Stock)
+                cart.forEach(item => {
+                    const itemRef = doc(db, "inventory", item.id);
+                    transaction.update(itemRef, {
+                        quantity: increment(-item.qty)
+                    });
                 });
             });
-
-            // 5. Commit
-            await batch.commit();
 
             showToast('تمت عملية البيع بنجاح!', 'success');
 

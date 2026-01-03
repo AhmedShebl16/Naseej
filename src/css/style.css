@@ -502,3 +502,148 @@ body {
     opacity: 1;
     transform: scale(1.1);
 }
+
+/* === Sales Toolbar Styles === */
+.sales-toolbar-container {
+    background: #fff;
+    padding: 8px 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.sales-filter-group {
+    /* Container for selects if needed */
+}
+
+.sales-filter-select {
+    background-color: #f8f9fa;
+    border: 1px solid #eee;
+    font-weight: 600;
+    color: #555;
+    border-radius: 8px;
+    padding: 10px 30px 10px 15px;
+    /* RTL Arrow Padding */
+    min-width: 150px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-position: left 0.75rem center;
+    background-size: 16px 12px;
+}
+
+.sales-filter-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.1);
+    outline: none;
+}
+
+/* Unified Search Bar - RTL Friendly */
+.sales-search-group {
+    flex-grow: 1;
+    min-width: 320px;
+    display: flex;
+    align-items: center;
+    background: #f8f9fa;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    /* Contains children corners */
+    transition: all 0.3s ease;
+}
+
+.sales-search-group:focus-within {
+    border-color: var(--primary-color);
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(183, 28, 28, 0.1);
+}
+
+.sales-search-icon {
+    padding: 0 15px;
+    color: #aaa;
+    background: transparent;
+    border: none;
+    font-size: 1.1rem;
+}
+
+.sales-search-input {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
+    padding: 12px 10px;
+    /* Added horizontal padding */
+    color: #333;
+    font-weight: 500;
+}
+
+.sales-search-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.sales-search-clear {
+    background: transparent;
+    border: none;
+    color: #ef5350;
+    padding: 0 15px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+    height: 100%;
+}
+
+.sales-search-clear:hover {
+    color: #c62828;
+    background: rgba(239, 83, 80, 0.1);
+}
+
+.sales-search-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0 30px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s;
+    height: 48px;
+    /* Match Input Height approximately */
+    display: flex;
+    /* Centering */
+    align-items: center;
+}
+
+.sales-search-btn:hover {
+    background: var(--primary-hover);
+}
+
+.sales-divider {
+    width: 1px;
+    height: 30px;
+    background: #eee;
+    margin: 0 5px;
+}
+
+/* Custom Badges */
+.bg-purple {
+    background-color: #6f42c1 !important;
+    color: white !important;
+}
+
+.badge {
+    padding: 0.5em 0.8em;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.bg-light.border {
+    background-color: #f8f9fa !important;
+    border: 1px solid #dee2e6 !important;
+    color: #333 !important;
+}

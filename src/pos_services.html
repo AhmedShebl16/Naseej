@@ -175,6 +175,58 @@
         </div>
     </div>
 
+    <!-- Checkout Details Modal -->
+    <div class="modal fade" id="checkoutDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header border-0 pb-0">
+                    <div>
+                        <h5 class="modal-title fw-bold text-dark">تفاصيل الدفع والتسليم</h5>
+                        <p class="text-muted small mb-0">يرجى استكمال البيانات لإتمام الطلب</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">إجمالي الفاتورة</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control fw-bold bg-light" id="checkoutTotalDisplay" disabled>
+                            <span class="input-group-text">ج.م</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-primary">المدفوع (مقدم / عربون)</label>
+                            <input type="number" class="form-control" id="amountPaidInput" placeholder="0.00">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold">المتوبقي</label>
+                            <input type="text" class="form-control bg-light text-danger fw-bold"
+                                id="remainingAmountDisplay" disabled value="0.00">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-danger">تاريخ التسليم *</label>
+                        <input type="date" class="form-control" id="deliveryDateInput" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">وقت التسليم (اختياري)</label>
+                        <input type="time" class="form-control" id="deliveryTimeInput">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="button" class="btn btn-primary rounded-pill px-4 flex-grow-1" id="confirmCheckoutBtn">
+                        <i class="bi bi-save me-2"></i> تأكيد وحفظ الطلب
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container position-fixed bottom-0 start-0 p-3">
         <div id="liveToast" class="toast align-items-center text-white bg-danger border-0" role="alert"

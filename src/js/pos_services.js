@@ -1,5 +1,5 @@
 import { db } from "./firebase-config.js";
-import { collection, query, where, getDocs, addDoc, doc, setDoc, getDoc, updateDoc, increment, Timestamp, writeBatch } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { collection, query, where, getDocs, addDoc, doc, setDoc, getDoc, updateDoc, increment, Timestamp, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 // === State ===
 let cart = [];
@@ -399,109 +399,191 @@ searchCustomerBtn.addEventListener('click', async () => {
     } catch (error) { console.error(error); showToast("خطأ في البحث"); }
 });
 
-checkoutBtn.addEventListener('click', async () => {
-    if (cart.length === 0) { showToast("السلة فارغة!"); return; }
-    if (!currentBranchId) { showToast("خطأ: لم يتم تحديد الفرع."); return; }
+// === Checkout Button (Opens Modal) ===
+checkoutBtn.addEventListener('click', () => {
+    if (cart.length === 0) {
+        showToast("السلة فارغة!");
+        return;
+    }
+    if (!currentBranchId) {
+        showToast("خطأ: لم يتم تحديد الفرع.");
+        return;
+    }
 
+    const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    document.getElementById('checkoutTotalDisplay').value = total.toLocaleString();
+    document.getElementById('amountPaidInput').value = '';
+    document.getElementById('remainingAmountDisplay').value = total.toLocaleString();
+    document.getElementById('deliveryDateInput').value = '';
+    document.getElementById('deliveryTimeInput').value = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('checkoutDetailsModal'));
+    modal.show();
+});
+
+// Update Remaining on Input
+document.getElementById('amountPaidInput').addEventListener('input', (e) => {
+    const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const paid = parseFloat(e.target.value) || 0;
+    const remaining = total - paid;
+    document.getElementById('remainingAmountDisplay').value = remaining.toLocaleString();
+});
+
+// === Confirm Checkout & Save ===
+document.getElementById('confirmCheckoutBtn').addEventListener('click', async () => {
+    const confirmBtn = document.getElementById('confirmCheckoutBtn');
+
+    // Validate
     let customerName = '';
     let customerId = '';
     const phone = normalizePhone(customerPhoneInput.value.trim());
 
     if (!currentCustomer) {
-        if (!phone || phone.length < 10) { showToast("رقم الهاتف غير صحيح"); return; }
+        if (!phone || phone.length < 10) { showToast("رقم الهاتف غير صحيح", "warning"); return; }
         customerName = newCustomerNameInput.value.trim();
-        if (!customerName) { showToast("أدخل اسم العميل"); return; }
+        if (!customerName) { showToast("أدخل اسم العميل", "warning"); return; }
         customerId = phone;
     } else {
         customerId = currentCustomer.id;
         customerName = currentCustomer.name;
     }
 
+    const deliveryDate = document.getElementById('deliveryDateInput').value;
+    const deliveryTime = document.getElementById('deliveryTimeInput').value;
 
-    // if (!confirm(...)) removed for 1-click checkout
+    if (!deliveryDate) {
+        alert('تاريخ التسليم مطلوب!');
+        return;
+    }
 
-    checkoutBtn.disabled = true;
-    checkoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الحفظ...';
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> جاري الحفظ...';
 
-    const batch = writeBatch(db);
+    // === TRANSACTION START ===
     try {
-        let totalCost = 0;
-        // 1. Process Multi-Material Deduction
-        for (const item of cart) {
-            if (item.materials && item.materials.length > 0) {
-                for (const mat of item.materials) {
-                    const totalMatQty = item.qty * mat.qty;
-                    const matRef = doc(db, "inventory", mat.id);
-                    batch.update(matRef, { quantity: increment(-totalMatQty) });
-                    totalCost += (mat.cost || 0) * totalMatQty;
+        await runTransaction(db, async (transaction) => {
+            // 1. Generate Custom Order ID
+            const now = new Date();
+            const dd = String(now.getDate()).padStart(2, '0');
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const yyyy = now.getFullYear();
+            const dateStr = `${dd}${mm}${yyyy}`; // 03012026
+
+            const counterRef = doc(db, "counters", "sales_" + dateStr);
+            const counterSnap = await transaction.get(counterRef);
+
+            let newCount = 1;
+            if (counterSnap.exists()) {
+                newCount = counterSnap.data().count + 1;
+            }
+            transaction.set(counterRef, { count: newCount }, { merge: true });
+
+            const orderId = `${dateStr}${String(newCount).padStart(3, '0')}`; // 03012026001
+
+            // 2. Calculations
+            const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+            const paid = parseFloat(document.getElementById('amountPaidInput').value) || 0;
+
+            // 3. Deduct Materials (Inventory)
+            let totalCost = 0;
+            for (const item of cart) {
+                if (item.materials && item.materials.length > 0) {
+                    for (const mat of item.materials) {
+                        const totalMatQty = item.qty * mat.qty;
+                        const matRef = doc(db, "inventory", mat.id);
+                        transaction.update(matRef, { quantity: increment(-totalMatQty) });
+                        totalCost += (mat.cost || 0) * totalMatQty;
+                    }
                 }
             }
-        }
 
-        const custRef = doc(db, "customers", customerId);
-        const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            // 4. Update/Create Customer
+            const custRef = doc(db, "customers", customerId);
+            if (!currentCustomer) {
+                transaction.set(custRef, {
+                    name: customerName,
+                    phone: customerId,
+                    totalSpent: total,
+                    orderCount: 1,
+                    lastOrderDate: Timestamp.now(),
+                    createdAt: Timestamp.now()
+                });
+            } else {
+                transaction.update(custRef, {
+                    totalSpent: increment(total),
+                    orderCount: increment(1),
+                    lastOrderDate: Timestamp.now()
+                });
+            }
 
-        if (!currentCustomer) {
-            batch.set(custRef, {
-                name: customerName,
-                phone: customerId,
-                totalSpent: totalAmount,
-                orderCount: 1,
-                lastOrderDate: Timestamp.now(),
-                createdAt: Timestamp.now()
-            });
-        } else {
-            batch.update(custRef, {
-                totalSpent: increment(totalAmount),
-                orderCount: increment(1),
-                lastOrderDate: Timestamp.now()
-            });
-        }
+            // 5. Create Sale Record with Custom ID
+            const saleRef = doc(db, "sales", orderId); // Use Custom ID as Doc ID
+            const user = localStorage.getItem('username') || 'Unknown';
 
-        const saleRef = doc(collection(db, "sales"));
-        batch.set(saleRef, {
-            customerName,
-            customerPhone: customerId,
-            items: cart.map(i => ({
-                id: i.serviceId,
-                name: i.name,
-                price: i.price,
-                qty: i.qty,
+            const saleData = {
+                orderId: orderId, // Explicit Field
+                customerName: customerName,
+                customerPhone: customerId,
+                items: cart.map(i => ({
+                    id: i.serviceId,
+                    name: i.name,
+                    price: i.price,
+                    qty: i.qty,
+                    type: 'service',
+                    usedMaterials: i.materials ? i.materials.map(m => ({
+                        id: m.id,
+                        name: m.name,
+                        qtyPerUnit: m.qty,
+                        unit: m.unit || ''
+                    })) : []
+                })),
+                totalAmount: total,
+                amountPaid: paid,
+                remainingAmount: total - paid,
+                deliveryDate: deliveryDate,
+                deliveryTime: deliveryTime || null,
                 type: 'service',
-                usedMaterials: i.materials ? i.materials.map(m => ({ // Store as Array
-                    id: m.id,
-                    name: m.name,
-                    qtyPerUnit: m.qty,
-                    totalQty: m.qty * i.qty
-                })) : []
-            })),
-            totalAmount,
-            status: 'completed',
-            type: 'service_order',
-            user: localStorage.getItem('username') || 'tailor',
-            branchId: currentBranchId,
-            branchName: currentBranchName,
-            createdAt: Timestamp.now()
+                serviceType: currentType, // 'tailoring', 'repair', or 'dry_clean'
+                status: 'received',
+                branchId: currentBranchId,
+                branchName: currentBranchName,
+                user: user,
+                createdAt: Timestamp.now()
+            };
+            transaction.set(saleRef, saleData);
+
+            // 6. Update Daily Stats
+            const todayIso = now.toISOString().split('T')[0];
+            const dailyStatsRef = doc(db, "daily_stats", todayIso);
+            transaction.set(dailyStatsRef, {
+                date: todayIso,
+                totalSales: increment(total),
+                totalCost: increment(totalCost),
+                orderCount: increment(1),
+                updatedAt: Timestamp.now()
+            }, { merge: true });
         });
 
-        const todayStr = new Date().toISOString().split('T')[0];
-        const dailyStatsRef = doc(db, "daily_stats", todayStr);
-        batch.set(dailyStatsRef, {
-            date: todayStr,
-            totalSales: increment(totalAmount),
-            totalCost: increment(totalCost),
-            orderCount: increment(1),
-            updatedAt: Timestamp.now()
-        }, { merge: true });
 
-        await batch.commit();
-        showToast("تم العملية بنجاح! ✅", "success");
-        setTimeout(() => window.location.reload(), 1500);
+
+        showToast('تم حفظ الطلب بنجاح!', 'success');
+        bootstrap.Modal.getInstance(document.getElementById('checkoutDetailsModal')).hide();
+
+        // 5. Reset UI
+        cart = [];
+        renderCart();
+        customerPhoneInput.value = '';
+        customerInfoDiv.style.display = 'none';
+        newCustomerInputDiv.style.display = 'none';
+        newCustomerNameInput.value = '';
+        currentCustomer = null;
 
     } catch (error) {
-        console.error(error);
-        showToast("خطأ: " + error.message);
-        checkoutBtn.disabled = false;
-        checkoutBtn.innerHTML = 'إتمام الطلب';
+        console.error("Checkout Error:", error);
+        showToast('حدث خطأ أثناء الحفظ: ' + error.message, 'danger');
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '<i class="bi bi-save me-2"></i> تأكيد وحفظ الطلب';
     }
 });
+
