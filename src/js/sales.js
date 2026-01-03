@@ -191,12 +191,103 @@ window.viewSaleDetails = function (id) {
     saleDetailsModal.show();
 }
 
-// Search (Basic Client Filter for loaded page - optional)
+// === Phone Normalization ===
+function normalizePhone(phone) {
+    if (!phone) return '';
+    let cleaned = phone.replace(/\D/g, '');
+
+    if (cleaned.startsWith('20') && cleaned.length === 12) {
+        cleaned = '0' + cleaned.substring(2);
+    } else if (cleaned.length === 10 && !cleaned.startsWith('0')) {
+        cleaned = '0' + cleaned;
+    }
+    return cleaned;
+}
+
+// Search (Enter Key + Phone Normalization)
+let activeSearchTerm = '';
+
 if (searchInput) {
-    searchInput.addEventListener('keydown', (e) => {
+    searchInput.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
-            // Implement server search later
-            loadSales('first');
+            e.preventDefault();
+            const rawTerm = e.target.value.trim();
+            const normalizedTerm = normalizePhone(rawTerm);
+            e.target.value = normalizedTerm || rawTerm; // Update input with normalized value
+
+            if (!normalizedTerm) {
+                activeSearchTerm = '';
+                loadSales('first');
+                return;
+            }
+
+            activeSearchTerm = normalizedTerm;
+
+            // Search by customer phone using Firestore query
+            try {
+                salesTableBody.innerHTML = '<tr><td colspan="6" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>';
+
+                const salesRef = collection(db, "sales");
+                const q = query(salesRef, where("customerPhone", "==", normalizedTerm), orderBy("createdAt", "desc"), limit(50));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    salesTableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4"><i class="bi bi-search display-3 opacity-25"></i><p class="mt-2">لا توجد نتائج للرقم: ' + normalizedTerm + '</p></td></tr>';
+                    updatePaginationControls(true);
+                    if (pageInfo) pageInfo.innerText = `نتائج البحث`;
+                    return;
+                }
+
+                salesDataStore = {};
+                let html = '';
+
+                querySnapshot.docs.forEach(docSnap => {
+                    const data = docSnap.data();
+                    salesDataStore[docSnap.id] = data;
+
+                    const date = data.createdAt ? data.createdAt.toDate().toLocaleString('ar-EG') : '-';
+                    const itemCount = data.items ? data.items.length : 0;
+                    const total = Number(data.totalAmount).toLocaleString();
+
+                    html += `
+                    <tr onclick="window.viewSaleDetails('${docSnap.id}')" style="cursor: pointer;">
+                        <td class="ps-4">${date}</td>
+                        <td>
+                            <div class="fw-bold">${data.customerName || 'عميل'}</div>
+                            <small class="text-muted" dir="ltr">${data.customerPhone || ''}</small>
+                        </td>
+                        <td><span class="badge bg-light text-dark border">${itemCount} أصناف</span></td>
+                        <td class="fw-bold text-success">${total} ج.م</td>
+                        <td>
+                            <div class="fw-bold small">${data.user || '-'}</div>
+                            <small class="text-muted">${data.branchName || '-'}</small>
+                        </td>
+                        <td><button class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></button></td>
+                    </tr>
+                    `;
+                });
+
+                salesTableBody.innerHTML = html;
+                if (pageInfo) pageInfo.innerText = `نتائج البحث: ${querySnapshot.docs.length} عملية`;
+
+                // Disable pagination during search
+                if (prevPageBtn) prevPageBtn.disabled = true;
+                if (nextPageBtn) nextPageBtn.disabled = true;
+
+            } catch (error) {
+                console.error("Search Error:", error);
+                salesTableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">خطأ في البحث: ${error.message}</td></tr>`;
+            }
         }
+    });
+}
+
+// Clear Search Button
+const clearSearchBtn = document.getElementById('clearSearchBtn');
+if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+        if (searchInput) searchInput.value = '';
+        activeSearchTerm = '';
+        loadSales('first');
     });
 }

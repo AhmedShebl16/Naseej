@@ -21,6 +21,24 @@ let currentPage = 1;
 const ITEMS_PER_PAGE = 15;
 let isSearching = false;
 
+// === Phone Normalization ===
+function normalizePhone(phone) {
+    if (!phone) return '';
+    let cleaned = phone.replace(/\D/g, ''); // Remove non-digits
+
+    // Egyptian phone formats:
+    // 01060558591 (11 digits, correct)
+    // 1060558591 (10 digits, missing leading 0)
+    // 201060558591 (12 digits, country code)
+
+    if (cleaned.startsWith('20') && cleaned.length === 12) {
+        cleaned = '0' + cleaned.substring(2);
+    } else if (cleaned.length === 10 && !cleaned.startsWith('0')) {
+        cleaned = '0' + cleaned;
+    }
+    return cleaned;
+}
+
 // === Toast Helper ===
 function showToast(message, type = 'success') {
     const toastEl = document.getElementById('appToast');
@@ -57,13 +75,21 @@ async function loadCustomers(direction = 'first') {
             const isPhone = /^\d/.test(searchTerm);
             const searchField = isPhone ? 'phone' : 'name';
 
+            // Normalize phone number for consistent search
+            const normalizedSearchTerm = isPhone ? normalizePhone(searchTerm) : searchTerm;
+
+            // Update the input with normalized value for user feedback
+            if (isPhone && searchInput) {
+                searchInput.value = normalizedSearchTerm;
+            }
+
             // Note: For efficient prefix search we sort by the search field FIRST
             if (direction === 'next' && lastVisibleDoc) {
                 q = query(customersRef,
                     orderBy(searchField),
                     startAfter(lastVisibleDoc),
-                    where(searchField, '>=', searchTerm),
-                    where(searchField, '<=', searchTerm + '\uf8ff'),
+                    where(searchField, '>=', normalizedSearchTerm),
+                    where(searchField, '<=', normalizedSearchTerm + '\uf8ff'),
                     limit(ITEMS_PER_PAGE)
                 );
             } else if (direction === 'prev' && pageStack.length > 0) {
@@ -75,8 +101,8 @@ async function loadCustomers(direction = 'first') {
                 // First page of search
                 q = query(customersRef,
                     orderBy(searchField),
-                    where(searchField, '>=', searchTerm),
-                    where(searchField, '<=', searchTerm + '\uf8ff'),
+                    where(searchField, '>=', normalizedSearchTerm),
+                    where(searchField, '<=', normalizedSearchTerm + '\uf8ff'),
                     limit(ITEMS_PER_PAGE)
                 );
             }

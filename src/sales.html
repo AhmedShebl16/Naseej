@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سجل المبيعات - نسيج</title>
+    <title>سجل المبيعات - Cairo Class</title>
     <link rel="icon" type="image/png" href="assets/logo-favicon.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
@@ -17,7 +17,8 @@
 
     <!-- Sidebar -->
     <div class="sidebar">
-        <h3 class="text-center fw-bold mb-4">نسيج <small style="font-size: 0.5em; display: block;">المبيعات</small>
+        <h3 class="text-center fw-bold mb-4">Cairo Class <small
+                style="font-size: 0.5em; display: block;">المبيعات</small>
         </h3>
         <ul class="nav flex-column">
             <li class="nav-item">
@@ -58,12 +59,18 @@
         <!-- Stats / Filters -->
         <div class="card p-3 mb-4">
             <div class="row g-3">
-                <div class="col-md-4">
+                <div class="col-md-5">
                     <div class="input-group">
-                        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                        <input type="text" id="salesSearchInput" class="form-control"
-                            placeholder="بحث برقم العميل أو الاسم...">
+                        <span class="input-group-text bg-white border-end-0">
+                            <i class="bi bi-telephone text-muted"></i>
+                        </span>
+                        <input type="text" id="salesSearchInput" class="form-control border-start-0 border-end-0"
+                            placeholder="بحث برقم الهاتف (اضغط Enter)" dir="ltr" style="text-align: right;">
+                        <button class="btn btn-outline-danger" type="button" id="clearSearchBtn" title="مسح البحث">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
                     </div>
+                    <small class="text-muted">أدخل رقم الهاتف واضغط Enter للبحث</small>
                 </div>
                 <!-- Add Date Range later if needed -->
             </div>
