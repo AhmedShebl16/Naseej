@@ -141,7 +141,7 @@ function renderGrid(services) {
     // Icon Map
     const icons = {
         'tailoring': 'bi-scissors',
-        'repair': 'bi-tools',
+        'repair': 'bi-patch-check',
         'dry_clean': 'bi-droplet'
     };
     const currentIcon = icons[currentType] || 'bi-scissors';
@@ -150,10 +150,12 @@ function renderGrid(services) {
         const col = document.createElement('div');
         col.className = 'col-6 col-md-4 col-lg-3';
         col.innerHTML = `
-            <div class="card h-100 service-card-modern p-3 d-flex flex-column justify-content-center align-items-center cursor-pointer">
-                <i class="bi ${currentIcon} card-icon"></i>
-                <h6 class="card-title text-center">${service.name}</h6>
-                <div class="card-price">${Number(service.price).toLocaleString()} ج.م</div>
+            <div class="service-card-premium d-flex flex-column align-items-center">
+                <div class="service-card-icon shadow-sm">
+                    <i class="bi ${currentIcon}"></i>
+                </div>
+                <div class="service-card-title text-center">${service.name}</div>
+                <div class="service-card-price">${Number(service.price).toLocaleString()} <small class="text-muted" style="font-size:0.6em">ج.م</small></div>
             </div>
         `;
         // Make the whole card clickable
@@ -331,42 +333,52 @@ function renderCart() {
         return;
     }
 
+    // Update Cart Count Badge
+    const cartCountBadge = document.getElementById('cartCountBadge');
+    if (cartCountBadge) cartCountBadge.innerText = cart.length;
+
     cart.forEach(item => {
         const itemTotal = item.price * item.qty;
         total += itemTotal;
 
         let matHtml = '';
         if (item.materials && item.materials.length > 0) {
-            matHtml = `<div class="mt-1 ps-2 border-start border-primary">`;
+            matHtml = `<div class="mt-2 ps-2 border-start border-primary border-opacity-50">`;
             item.materials.forEach(m => {
-                matHtml += `<div class="text-muted small" style="font-size:0.75em">• ${m.name}: ${m.qty} <span class="opacity-75">x${item.qty}</span></div>`;
+                matHtml += `<div class="cart-item-meta">• ${m.name}: ${m.qty} <span class="opacity-50">x${item.qty}</span></div>`;
             });
             matHtml += `</div>`;
         }
 
         const div = document.createElement('div');
-        div.className = 'cart-item-modern d-flex justify-content-between align-items-center';
+        div.className = 'cart-item-modern';
         div.innerHTML = `
-            <div style="width: 45%">
-                <div class="item-title text-truncate">${item.name}</div>
-                ${matHtml}
-                <div class="item-price mt-1">${Number(item.price).toLocaleString()} ج.م</div>
+            <div class="d-flex justify-content-between align-items-start">
+                <div style="width: 65%">
+                    <div class="cart-item-title text-truncate">${item.name}</div>
+                    ${matHtml}
+                </div>
+                <div class="text-end">
+                    <button class="btn btn-sm text-danger p-0" onclick="window.cartMethods.removeFromCart(${item.uniqueId})">
+                        <i class="bi bi-x-lg" style="font-size: 0.8rem;"></i>
+                    </button>
+                </div>
             </div>
             
-            <div class="qty-control">
-                <button class="btn btn-sm btn-link text-dark p-0" onclick="window.cartMethods.updateQty(${item.uniqueId}, -1)"><i class="bi bi-dash"></i></button>
-                <span class="fw-bold mx-2" style="font-size:0.9rem">${item.qty}</span>
-                <button class="btn btn-sm btn-link text-dark p-0" onclick="window.cartMethods.updateQty(${item.uniqueId}, 1)"><i class="bi bi-plus"></i></button>
-            </div>
-
-            <div class="text-end" style="width: 20%">
-                <div class="fw-bold text-primary small">${itemTotal.toLocaleString()}</div>
-                <button class="btn btn-sm delete-btn p-0 mt-1" onclick="window.cartMethods.removeFromCart(${item.uniqueId})"><i class="bi bi-trash"></i></button>
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary border-opacity-25">
+                <div class="d-flex align-items-center bg-dark bg-opacity-50 rounded-pill px-2 border border-secondary border-opacity-25">
+                    <button class="btn btn-sm btn-link text-white p-0" onclick="window.cartMethods.updateQty(${item.uniqueId}, -1)"><i class="bi bi-dash"></i></button>
+                    <span class="fw-bold mx-2 text-white" style="font-size:0.85rem">${item.qty}</span>
+                    <button class="btn btn-sm btn-link text-white p-0" onclick="window.cartMethods.updateQty(${item.uniqueId}, 1)"><i class="bi bi-plus"></i></button>
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold text-primary">${itemTotal.toLocaleString()} <small style="font-size:0.7em">ج.م</small></div>
+                </div>
             </div>
         `;
         cartContainer.appendChild(div);
     });
-    cartTotalEl.innerText = total.toLocaleString() + ' ج.م';
+    cartTotalEl.innerText = total.toLocaleString();
 }
 
 function normalizePhone(phone) {
